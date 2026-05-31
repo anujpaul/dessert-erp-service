@@ -6,7 +6,7 @@ public enum SalesOrderStatus { Draft, Confirmed, Picking, Shipped, Invoiced, Clo
 
 public class SalesOrder : BaseEntity
 {
-    public Guid Id { get; set; }
+    // public Guid Id { get; set; }
     public Guid OrganizationId { get; private set; }
     public string OrderNumber { get; private set; } = string.Empty;
     public Guid CustomerId { get; private set; }

@@ -3,17 +3,20 @@ using System;
 using DessertERP.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace DessertERP.Infrastructure.Migrations
+namespace DessertERP.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260531145044_AddBatchJobConfigs")]
+    partial class AddBatchJobConfigs
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -185,16 +188,10 @@ namespace DessertERP.Infrastructure.Migrations
                     b.Property<DateTime?>("ExpectedDate")
                         .HasColumnType("timestamp without time zone");
 
-                    b.Property<DateTime?>("ExportedAt")
-                        .HasColumnType("timestamp without time zone");
-
                     b.Property<decimal>("GrandTotal")
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsExported")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime>("OrderDate")
@@ -322,13 +319,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-                    b.Property<DateTime?>("ExportedAt")
-                        .HasColumnType("timestamp without time zone");
-
                     b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsExported")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Name")
@@ -607,16 +598,10 @@ namespace DessertERP.Infrastructure.Migrations
                     b.Property<decimal>("DiscountTotal")
                         .HasColumnType("numeric(18,4)");
 
-                    b.Property<DateTime?>("ExportedAt")
-                        .HasColumnType("timestamp without time zone");
-
                     b.Property<decimal>("GrandTotal")
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsExported")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime>("OrderDate")
@@ -727,6 +712,11 @@ namespace DessertERP.Infrastructure.Migrations
                     b.Property<bool>("AutoConfirmSalesOrders")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("ContainerName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp without time zone");
 
@@ -735,14 +725,28 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("ErrorPrefix")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("ExportFileNamePattern")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ExportPrefix")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("FileFormat")
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
+
+                    b.Property<string>("InboxPrefix")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -773,25 +777,6 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<string>("LocalErrorPath")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("LocalExportPath")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("LocalInboxPath")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("LocalProcessedPath")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -799,6 +784,16 @@ namespace DessertERP.Infrastructure.Migrations
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ProcessedPrefix")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("StorageType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp without time zone");
@@ -810,68 +805,6 @@ namespace DessertERP.Infrastructure.Migrations
                     b.HasIndex("OrganizationId", "IsEnabled");
 
                     b.ToTable("batch_job_configs", (string)null);
-                });
-
-            modelBuilder.Entity("DessertERP.Domain.Modules.DataManagement.ExportJobRow", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("BatchJobConfigId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("BlobName")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<Guid>("EntityId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("EntityRef")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<DateTime>("ExportedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid>("OrganizationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OrganizationId");
-
-                    b.HasIndex("BatchJobConfigId", "ExportedAt");
-
-                    b.HasIndex("EntityType", "EntityId");
-
-                    b.ToTable("export_job_rows", (string)null);
                 });
 
             modelBuilder.Entity("DessertERP.Domain.Modules.DataManagement.ImportJob", b =>
@@ -1596,9 +1529,6 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<DateTime?>("ExportedAt")
-                        .HasColumnType("timestamp without time zone");
-
                     b.Property<string>("GenderTarget")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -1609,9 +1539,6 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsExported")
                         .HasColumnType("boolean");
 
                     b.Property<string>("LongDescription")

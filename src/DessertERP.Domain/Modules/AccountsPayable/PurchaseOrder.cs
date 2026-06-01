@@ -19,6 +19,10 @@ public class PurchaseOrder : BaseEntity
     public decimal GrandTotal { get; private set; }
     public Guid? APInvoiceId { get; private set; }
 
+    // Export tracking
+    public bool      IsExported { get; private set; }
+    public DateTime? ExportedAt { get; private set; }
+
     public Vendor? Vendor { get; private set; }
 
     private readonly List<PurchaseOrderLine> _lines = new();
@@ -95,6 +99,20 @@ public class PurchaseOrder : BaseEntity
         if (Status != PurchaseOrderStatus.Invoiced)
             throw new InvalidOperationException("Only an Invoiced PO can be closed.");
         Status = PurchaseOrderStatus.Closed;
+        SetUpdated();
+    }
+
+    public void MarkExported()
+    {
+        IsExported = true;
+        ExportedAt = DateTime.UtcNow;
+        SetUpdated();
+    }
+
+    public void ResetExport()
+    {
+        IsExported = false;
+        ExportedAt = null;
         SetUpdated();
     }
 

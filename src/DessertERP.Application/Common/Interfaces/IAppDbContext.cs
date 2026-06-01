@@ -1,5 +1,6 @@
 using DessertERP.Domain.Modules.AccountsPayable;
 using DessertERP.Domain.Modules.AccountsReceivable;
+using DessertERP.Domain.Modules.DataManagement;
 using DessertERP.Domain.Modules.GeneralLedger;
 using DessertERP.Domain.Modules.Organization;
 using DessertERP.Domain.Modules.ProductManagement;
@@ -48,6 +49,12 @@ public interface IAppDbContext
     DbSet<RolePermission> RolePermissions { get; }
     DbSet<UserRole>      UserRoles  { get; }
     DbSet<AuditLogEntry> AuditLogs  { get; }
+
+    // Data Management
+    DbSet<ImportJob>      ImportJobs      { get; }
+    DbSet<ImportJobRow>   ImportJobRows   { get; }
+    DbSet<ExportJobRow>   ExportJobRows   { get; }
+    DbSet<BatchJobConfig> BatchJobConfigs { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

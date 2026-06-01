@@ -27,6 +27,10 @@ public class Product : BaseEntity
     public ProductStatus Status { get; private set; } = ProductStatus.Active;
     public Guid? PreferredVendorId { get; private set; } // FK → Vendor (AP module)
 
+    // Export tracking
+    public bool      IsExported { get; private set; }
+    public DateTime? ExportedAt { get; private set; }
+
     public Category? Category { get; private set; }
     public Brand? Brand { get; private set; }
 
@@ -98,4 +102,7 @@ public class Product : BaseEntity
     public void Discontinue() { Status = ProductStatus.Discontinued; SetUpdated(); }
     public void Activate()    { Status = ProductStatus.Active;        SetUpdated(); }
     public void Deactivate()  { Status = ProductStatus.Inactive;      SetUpdated(); }
+
+    public void MarkExported() { IsExported = true; ExportedAt = DateTime.UtcNow; SetUpdated(); }
+    public void ResetExport()  { IsExported = false; ExportedAt = null; SetUpdated(); }
 }

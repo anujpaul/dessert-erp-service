@@ -19,6 +19,10 @@ public class Vendor : BaseEntity
     public string? BankAccountNumber { get; private set; }
     public VendorStatus Status { get; private set; } = VendorStatus.Active;
 
+    // Export tracking
+    public bool      IsExported { get; private set; }
+    public DateTime? ExportedAt { get; private set; }
+
     private Vendor() { }
 
     public Vendor(Guid organizationId, string vendorNumber, string name, string? email = null,
@@ -50,4 +54,7 @@ public class Vendor : BaseEntity
     }
 
     public void SetStatus(VendorStatus status) { Status = status; SetUpdated(); }
+
+    public void MarkExported() { IsExported = true; ExportedAt = DateTime.UtcNow; SetUpdated(); }
+    public void ResetExport()  { IsExported = false; ExportedAt = null; SetUpdated(); }
 }

@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using DessertERP.Application.Common.Interfaces;
 using DessertERP.Application.Modules.AccountsPayable.Services;
 using DessertERP.Application.Modules.AccountsReceivable.Services;
+using DessertERP.Application.Modules.DataManagement.Services;
 using DessertERP.Application.Modules.GeneralLedger.Services;
 using DessertERP.Application.Modules.Organization.Services;
 using DessertERP.Application.Modules.ProductManagement.Services;
@@ -10,6 +11,7 @@ using DessertERP.Application.Modules.SystemAdmin.Services;
 using DessertERP.Infrastructure.Persistence;
 using DessertERP.Infrastructure.Persistence.Seed;
 using DessertERP.Infrastructure.Services;
+using DessertERP.Infrastructure.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -42,6 +44,11 @@ builder.Services.AddScoped<IGeneralLedgerService, GeneralLedgerService>();
 builder.Services.AddScoped<IAccountsReceivableService, AccountsReceivableService>();
 builder.Services.AddScoped<IAccountsPayableService, AccountsPayableService>();
 builder.Services.AddScoped<IProductManagementService, ProductManagementService>();
+
+// ── Data Management ───────────────────────────────────────────────────────────
+builder.Services.AddScoped<IDataManagementService, DataManagementService>();
+builder.Services.AddScoped<IBatchJobService, BatchJobService>();
+builder.Services.AddSingleton<IBlobStorageService, AzureBlobStorageService>();
 
 // ── System Admin services ─────────────────────────────────────────────────────
 builder.Services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();

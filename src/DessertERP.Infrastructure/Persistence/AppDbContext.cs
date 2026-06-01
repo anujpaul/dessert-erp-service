@@ -1,6 +1,7 @@
 using DessertERP.Application.Common.Interfaces;
 using DessertERP.Domain.Modules.AccountsPayable;
 using DessertERP.Domain.Modules.AccountsReceivable;
+using DessertERP.Domain.Modules.DataManagement;
 using DessertERP.Domain.Modules.GeneralLedger;
 using DessertERP.Domain.Modules.Organization;
 using DessertERP.Domain.Modules.ProductManagement;
@@ -52,6 +53,12 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<PurchaseOrderLine>  PurchaseOrderLines => Set<PurchaseOrderLine>();
     public DbSet<APInvoice>          APInvoices         => Set<APInvoice>();
     public DbSet<APPayment>          APPayments         => Set<APPayment>();
+
+    // Data Management
+    public DbSet<ImportJob>      ImportJobs      => Set<ImportJob>();
+    public DbSet<ImportJobRow>   ImportJobRows   => Set<ImportJobRow>();
+    public DbSet<ExportJobRow>   ExportJobRows   => Set<ExportJobRow>();
+    public DbSet<BatchJobConfig> BatchJobConfigs => Set<BatchJobConfig>();
 
     // System Admin
     public DbSet<AppUser>        AppUsers        => Set<AppUser>();
@@ -116,6 +123,15 @@ public class AppDbContext : DbContext, IAppDbContext
         modelBuilder.Entity<APInvoice>()
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<APPayment>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+
+        // Data Management — org-scoped, soft-delete
+        modelBuilder.Entity<ImportJob>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        // ImportJobRow: soft-delete only — org filter is enforced via the parent ImportJob
+        modelBuilder.Entity<ImportJobRow>()
+            .HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<BatchJobConfig>()
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
 
         // System Admin — org-scoped, soft-delete

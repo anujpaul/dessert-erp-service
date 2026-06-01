@@ -23,6 +23,10 @@ public class SalesOrder : BaseEntity
     public decimal GrandTotal { get; private set; }
     public Guid? ARInvoiceId { get; private set; }
 
+    // Export tracking
+    public bool      IsExported { get; private set; }
+    public DateTime? ExportedAt { get; private set; }
+
     public Customer? Customer { get; private set; }
 
     private readonly List<SalesOrderLine> _lines = new();
@@ -112,6 +116,20 @@ public class SalesOrder : BaseEntity
         if (Status != SalesOrderStatus.Invoiced)
             throw new InvalidOperationException("Only an Invoiced order can be closed.");
         Status = SalesOrderStatus.Closed;
+        SetUpdated();
+    }
+
+    public void MarkExported()
+    {
+        IsExported = true;
+        ExportedAt = DateTime.UtcNow;
+        SetUpdated();
+    }
+
+    public void ResetExport()
+    {
+        IsExported = false;
+        ExportedAt = null;
         SetUpdated();
     }
 

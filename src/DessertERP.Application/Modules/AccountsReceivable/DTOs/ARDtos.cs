@@ -19,13 +19,15 @@ public record SalesOrderLineDto(Guid Id, Guid ProductVariantId, string Sku,
 
 public record SalesOrderSummaryDto(Guid Id, string OrderNumber, Guid CustomerId,
     string CustomerName, DateTime OrderDate, DateTime? RequestedShipDate,
-    string CustomerRef, string Status, decimal GrandTotal, int LineCount, DateTime CreatedAt);
+    string CustomerRef, string Status, decimal GrandTotal, int LineCount, DateTime CreatedAt,
+    bool IsExported, DateTime? ExportedAt);
 
 public record SalesOrderDto(Guid Id, string OrderNumber, Guid CustomerId, string CustomerName,
     DateTime OrderDate, DateTime? RequestedShipDate, DateTime? ActualShipDate,
     string Description, string CustomerRef, string Currency, string Status,
     decimal SubTotal, decimal TaxTotal, decimal DiscountTotal, decimal GrandTotal,
-    Guid? ARInvoiceId, DateTime CreatedAt, IReadOnlyList<SalesOrderLineDto> Lines);
+    Guid? ARInvoiceId, DateTime CreatedAt, IReadOnlyList<SalesOrderLineDto> Lines,
+    bool IsExported, DateTime? ExportedAt);
 
 public record CreateSalesOrderRequest(
     Guid CustomerId, DateTime OrderDate, string Description,

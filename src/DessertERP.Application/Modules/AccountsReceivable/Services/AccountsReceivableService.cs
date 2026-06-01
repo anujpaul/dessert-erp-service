@@ -86,7 +86,8 @@ public class AccountsReceivableService : IAccountsReceivableService
         return orders.Select(o => new SalesOrderSummaryDto(
             o.Id, o.OrderNumber, o.CustomerId, o.Customer?.Name ?? string.Empty,
             o.OrderDate, o.RequestedShipDate, o.CustomerRef,
-            o.Status.ToString(), o.GrandTotal, o.Lines.Count, o.CreatedAt));
+            o.Status.ToString(), o.GrandTotal, o.Lines.Count, o.CreatedAt,
+            o.IsExported, o.ExportedAt));
     }
 
     public async Task<SalesOrderDto?> GetSalesOrderAsync(Guid id, CancellationToken ct = default)
@@ -373,7 +374,8 @@ public class AccountsReceivableService : IAccountsReceivableService
             o.OrderDate, o.RequestedShipDate, o.ActualShipDate,
             o.Description, o.CustomerRef, o.Currency, o.Status.ToString(),
             subTotal, taxTotal, discountTotal, grandTotal,
-            o.ARInvoiceId, o.CreatedAt, lineDtos);
+            o.ARInvoiceId, o.CreatedAt, lineDtos,
+            o.IsExported, o.ExportedAt);
     }
 
     private static ARInvoiceDto ToARInvoiceDto(ARInvoice i) => new(

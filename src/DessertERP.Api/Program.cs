@@ -144,12 +144,19 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// ── Seed database ─────────────────────────────────────────────────────────────
+// ── Seed database + register Hangfire sweep job ───────────────────────────────
 using (var scope = app.Services.CreateScope())
 {
     var db     = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     await DatabaseSeeder.SeedAsync(db, logger);
+
+    // Register the import sweep job once at startup
+    var recurring = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+    recurring.AddOrUpdate<ImportBatchSweepJob>(
+        "sweep-queued-imports",
+        j => j.SweepAsync(),
+        Cron.Hourly());
 }
 
 // ── Middleware ────────────────────────────────────────────────────────────────

@@ -7,6 +7,15 @@
     <RootNamespace>DessertERP.Worker</RootNamespace>
   </PropertyGroup>
 
+  <!-- Prevent appsettings.json from being copied into referencing projects (e.g. DessertERP.Api).
+       When the Worker runs embedded inside the Api, the Api's own appsettings.json is used. -->
+  <ItemGroup>
+    <Content Update="appsettings*.json">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.14" />
     <PackageReference Include="Hangfire.PostgreSql" Version="1.20.9" />

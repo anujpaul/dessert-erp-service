@@ -12,6 +12,10 @@ using DessertERP.Infrastructure.Persistence;
 using DessertERP.Infrastructure.Persistence.Seed;
 using DessertERP.Infrastructure.Services;
 using DessertERP.Infrastructure.Storage;
+using DessertERP.Worker.Jobs;
+using DessertERP.Worker.Workers;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -49,6 +53,24 @@ builder.Services.AddScoped<IProductManagementService, ProductManagementService>(
 builder.Services.AddScoped<IDataManagementService, DataManagementService>();
 builder.Services.AddScoped<IBatchJobService, BatchJobService>();
 builder.Services.AddSingleton<IBlobStorageService, AzureBlobStorageService>();
+
+// ── Hangfire (server runs inside the API process) ─────────────────────────────
+builder.Services.AddHangfire(config =>
+    config.UsePostgreSqlStorage(c =>
+        c.UseNpgsqlConnection(connectionString)));
+
+builder.Services.AddHangfireServer(options =>
+{
+    options.WorkerCount = 4;
+    options.ServerName  = "DessertERP.Api.HangfireServer";
+});
+
+// Batch job hosted services and job classes
+builder.Services.AddHostedService<BatchJobSchedulerWorker>(); // syncs DB → Hangfire every 60s
+builder.Services.AddScoped<BatchImportJob>();
+builder.Services.AddScoped<BatchExportJob>();
+builder.Services.AddScoped<ImportBatchJob>();
+builder.Services.AddScoped<ImportBatchSweepJob>();
 
 // ── System Admin services ─────────────────────────────────────────────────────
 builder.Services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
@@ -149,5 +171,12 @@ app.UseCors("AllowAngular");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+// Hangfire dashboard (restrict in production as needed)
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    IsReadOnlyFunc = _ => false,  // set true to make it read-only in prod
+    Authorization  = []           // no extra auth on top of the app's auth for now
+});
 
 app.Run();

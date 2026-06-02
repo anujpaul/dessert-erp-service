@@ -3,17 +3,20 @@ using System;
 using DessertERP.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace DessertERP.Infrastructure.Migrations
+namespace DessertERP.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260602134515_AddRetailModule")]
+    partial class AddRetailModule
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -29,7 +32,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -37,10 +40,10 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.Property<DateTime>("DueDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<DateTime>("InvoiceDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("InvoiceNumber")
                         .IsRequired()
@@ -77,7 +80,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<Guid>("VendorId")
                         .HasColumnType("uuid");
@@ -112,7 +115,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -124,7 +127,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("PaymentDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
@@ -146,7 +149,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<Guid>("VendorId")
                         .HasColumnType("uuid");
@@ -170,7 +173,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Currency")
                         .IsRequired()
@@ -183,10 +186,10 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.Property<DateTime?>("ExpectedDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<DateTime?>("ExportedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<decimal>("GrandTotal")
                         .HasColumnType("numeric(18,4)");
@@ -198,7 +201,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<DateTime>("OrderDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
@@ -220,7 +223,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<Guid>("VendorId")
                         .HasColumnType("uuid");
@@ -242,7 +245,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -281,7 +284,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -311,7 +314,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(50)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Currency")
                         .IsRequired()
@@ -323,7 +326,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(200)");
 
                     b.Property<DateTime?>("ExportedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -356,7 +359,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(50)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("VendorNumber")
                         .IsRequired()
@@ -378,7 +381,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<Guid>("CustomerId")
                         .HasColumnType("uuid");
@@ -392,10 +395,10 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<DateTime>("DueDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<DateTime>("InvoiceDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("InvoiceNumber")
                         .IsRequired()
@@ -432,7 +435,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -459,7 +462,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<Guid>("CustomerId")
                         .HasColumnType("uuid");
@@ -474,7 +477,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("PaymentDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
@@ -496,7 +499,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -518,7 +521,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<decimal>("CreditLimit")
                         .HasColumnType("numeric(18,4)");
@@ -561,7 +564,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -581,10 +584,10 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime?>("ActualShipDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Currency")
                         .IsRequired()
@@ -608,7 +611,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<DateTime?>("ExportedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<decimal>("GrandTotal")
                         .HasColumnType("numeric(18,4)");
@@ -620,7 +623,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<DateTime>("OrderDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("OrderNumber")
                         .IsRequired()
@@ -631,7 +634,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime?>("RequestedShipDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -645,7 +648,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -664,7 +667,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<decimal>("DiscountPct")
                         .HasColumnType("numeric(8,4)");
@@ -703,7 +706,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("VariantDescription")
                         .HasMaxLength(200)
@@ -728,7 +731,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("CronExpression")
                         .IsRequired()
@@ -756,7 +759,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(50)");
 
                     b.Property<DateTime?>("LastRunAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<int>("LastRunFilesProcessed")
                         .HasColumnType("integer");
@@ -801,7 +804,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -827,7 +830,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<Guid>("EntityId")
                         .HasColumnType("uuid");
@@ -847,7 +850,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(2000)");
 
                     b.Property<DateTime>("ExportedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -861,7 +864,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -881,10 +884,10 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("EntityType")
                         .IsRequired()
@@ -920,7 +923,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime?>("StartedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -938,7 +941,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(50)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -956,7 +959,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("ErrorMessage")
                         .HasMaxLength(2000)
@@ -969,7 +972,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<DateTime?>("PromotedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<Guid?>("PromotedEntityId")
                         .HasColumnType("uuid");
@@ -987,7 +990,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -1016,7 +1019,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Currency")
                         .IsRequired()
@@ -1053,7 +1056,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -1079,7 +1082,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("integer");
@@ -1098,7 +1101,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(10)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -1112,10 +1115,10 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<DateTime>("EndDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<Guid>("FiscalYearId")
                         .HasColumnType("uuid");
@@ -1132,7 +1135,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("StartDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1140,7 +1143,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -1161,7 +1164,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(50)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -1169,7 +1172,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.Property<DateTime>("EndDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -1186,7 +1189,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("StartDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1194,7 +1197,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -1211,7 +1214,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Currency")
                         .IsRequired()
@@ -1224,7 +1227,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.Property<DateTime>("EntryDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("EntryNumber")
                         .IsRequired()
@@ -1262,7 +1265,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -1284,7 +1287,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<decimal>("Credit")
                         .HasColumnType("numeric(18,4)");
@@ -1307,7 +1310,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -1343,7 +1346,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnName("code");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("created_at");
 
                     b.Property<string>("DefaultCurrency")
@@ -1398,7 +1401,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnName("timezone");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
@@ -1425,7 +1428,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(100)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
@@ -1450,7 +1453,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Website")
                         .HasMaxLength(300)
@@ -1476,7 +1479,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(30)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
@@ -1503,7 +1506,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -1522,13 +1525,13 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime?>("LastCountDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Location")
                         .HasMaxLength(50)
@@ -1556,7 +1559,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -1585,7 +1588,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Currency")
                         .IsRequired()
@@ -1597,7 +1600,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(1000)");
 
                     b.Property<DateTime?>("ExportedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("GenderTarget")
                         .IsRequired()
@@ -1657,7 +1660,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -1695,7 +1698,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -1729,7 +1732,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<decimal>("Weight")
                         .HasColumnType("numeric(10,4)");
@@ -1759,10 +1762,10 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(100)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<DateTime?>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
@@ -1780,7 +1783,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<int>("UsedCount")
                         .HasColumnType("integer");
@@ -1805,7 +1808,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<decimal>("DiscountApplied")
                         .HasColumnType("numeric(18,4)");
@@ -1820,10 +1823,10 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("RedeemedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -1844,7 +1847,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -1862,7 +1865,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(200)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -1891,15 +1894,6 @@ namespace DessertERP.Infrastructure.Migrations
                     b.Property<decimal>("ChangeAmount")
                         .HasColumnType("numeric(18,4)");
 
-                    b.Property<string>("Channel")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("ChannelNotes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
                     b.Property<string>("CouponCode")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
@@ -1908,44 +1902,19 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Currency")
                         .IsRequired()
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)");
 
-                    b.Property<string>("CustomerEmail")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("CustomerName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("CustomerPhone")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("DeliveryAddress")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
                     b.Property<decimal>("DiscountTotal")
                         .HasColumnType("numeric(18,4)");
-
-                    b.Property<string>("ExternalOrderRef")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("ExternalRef")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
-
-                    b.Property<string>("FulfillmentStatus")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
 
                     b.Property<decimal>("GrandTotal")
                         .HasColumnType("numeric(18,4)");
@@ -1985,7 +1954,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<DateTime>("TransactionDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("TransactionNumber")
                         .IsRequired()
@@ -1998,7 +1967,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -2017,7 +1986,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<decimal>("DiscountAmount")
                         .HasColumnType("numeric(18,4)");
@@ -2071,7 +2040,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -2097,7 +2066,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
@@ -2112,7 +2081,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<DateTime?>("EndDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<int?>("GetQuantity")
                         .HasColumnType("integer");
@@ -2138,7 +2107,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("StartDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -2146,7 +2115,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<int>("UsedCount")
                         .HasColumnType("integer");
@@ -2169,7 +2138,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
@@ -2199,7 +2168,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -2216,7 +2185,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -2235,10 +2204,10 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<DateTime?>("LastLoginAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<DateTime?>("LockedUntil")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
@@ -2253,7 +2222,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.Property<DateTime?>("RefreshTokenExpiry")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -2261,7 +2230,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Username")
                         .IsRequired()
@@ -2288,7 +2257,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(100)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("EntityId")
                         .HasMaxLength(100)
@@ -2315,7 +2284,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(4000)");
 
                     b.Property<DateTime>("OccurredAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("OldValues")
                         .HasMaxLength(4000)
@@ -2325,7 +2294,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<Guid?>("UserId")
                         .HasColumnType("uuid");
@@ -2351,7 +2320,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -2373,7 +2342,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -2395,7 +2364,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(50)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -2409,7 +2378,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -2426,7 +2395,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -2435,7 +2404,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");

@@ -2,6 +2,7 @@ using DessertERP.Application.Common.Interfaces;
 using DessertERP.Application.Modules.DataManagement.DTOs;
 using DessertERP.Domain.Modules.DataManagement;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace DessertERP.Application.Modules.DataManagement.Services;
 
@@ -30,15 +31,15 @@ public record BatchJobConfigDto(
 
 public record CreateBatchJobRequest(
     string Name,
-    string JobType,             // e.g. "ImportSalesOrder"
+    string JobType,
     string LocalInboxPath,
     string LocalProcessedPath,
     string LocalErrorPath,
     string FileFormat,
     string CronExpression,
     bool   AutoConfirmSalesOrders,
-    string? LocalExportPath           = null,
-    string? ExportFileNamePattern     = null
+    string? LocalExportPath       = null,
+    string? ExportFileNamePattern = null
 );
 
 public record UpdateBatchJobRequest(
@@ -50,8 +51,8 @@ public record UpdateBatchJobRequest(
     string LocalErrorPath,
     string FileFormat,
     bool   AutoConfirmSalesOrders,
-    string? LocalExportPath           = null,
-    string? ExportFileNamePattern     = null
+    string? LocalExportPath       = null,
+    string? ExportFileNamePattern = null
 );
 
 // ── Interface ─────────────────────────────────────────────────────────────────
@@ -66,7 +67,6 @@ public interface IBatchJobService
     Task DisableAsync(Guid jobId, CancellationToken ct = default);
     Task DeleteAsync(Guid jobId, CancellationToken ct = default);
 
-    // Called by Hangfire job
     Task<BatchJobRunResult> RunImportJobAsync(Guid jobConfigId, CancellationToken ct = default);
     Task<BatchJobRunResult> RunExportJobAsync(Guid jobConfigId, CancellationToken ct = default);
 }
@@ -85,11 +85,16 @@ public class BatchJobService : IBatchJobService
 {
     private readonly IAppDbContext _db;
     private readonly IDataManagementService _dm;
+    private readonly IFileShareService _fs;
+    private readonly ILogger<BatchJobService> _logger;
 
-    public BatchJobService(IAppDbContext db, IDataManagementService dm)
+    public BatchJobService(IAppDbContext db, IDataManagementService dm,
+        IFileShareService fs, ILogger<BatchJobService> logger)
     {
-        _db = db;
-        _dm = dm;
+        _db     = db;
+        _dm     = dm;
+        _fs     = fs;
+        _logger = logger;
     }
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
@@ -171,19 +176,23 @@ public class BatchJobService : IBatchJobService
         if (!config.IsEnabled)
             return new BatchJobRunResult(true, 0, 0, 0, "Job is disabled.");
 
-        var inboxPath = config.LocalInboxPath;
-        if (!Directory.Exists(inboxPath))
+        var ext   = "." + config.FileFormat.ToLower();
+        var inbox = config.LocalInboxPath.Trim('/');
+
+        List<string> files;
+        try
         {
-            var msg = $"Inbox folder does not exist: {inboxPath}";
+            files = await _fs.ListFilesAsync(inbox, ext, ct);
+        }
+        catch (Exception ex)
+        {
+            var msg = $"Cannot list files in share path '{inbox}': {ex.Message}";
             config.RecordRun(BatchJobRunStatus.Failed, msg);
             await _db.SaveChangesAsync(ct);
             return new BatchJobRunResult(false, 0, 0, 0, msg);
         }
 
-        var ext   = "*." + config.FileFormat.ToLower();
-        var files = Directory.GetFiles(inboxPath, ext);
-
-        if (files.Length == 0)
+        if (files.Count == 0)
         {
             config.RecordRun(BatchJobRunStatus.NoFilesFound, "No files found in inbox.", 0, 0);
             await _db.SaveChangesAsync(ct);
@@ -199,25 +208,27 @@ public class BatchJobService : IBatchJobService
             _ => throw new InvalidOperationException($"Job type {config.JobType} is not an import job.")
         };
 
-        int totalFiles = 0, totalPromoted = 0, totalFailed = 0;
-        var errors = new List<string>();
-
         var org = await _db.Organizations.FirstOrDefaultAsync(ct)
             ?? throw new InvalidOperationException("No organization found.");
 
-        // Ensure processed / error folders exist
-        Directory.CreateDirectory(config.LocalProcessedPath);
-        Directory.CreateDirectory(config.LocalErrorPath);
+        int totalFiles = 0, totalPromoted = 0, totalFailed = 0;
+        var errors = new List<string>();
+        var stamp  = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+        var processed = config.LocalProcessedPath.Trim('/');
+        var error     = config.LocalErrorPath.Trim('/');
 
-        foreach (var filePath in files)
+        foreach (var fileName in files)
         {
-            var fileName = Path.GetFileName(filePath);
-            var stamp    = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+            string? tempPath = null;
             try
             {
-                // Create import job using the file path directly (no temp copy needed)
+                // Download file from Azure Files to a temp file for processing
+                var data = await _fs.DownloadAsync(inbox, fileName, ct);
+                tempPath = Path.Combine(Path.GetTempPath(), $"dessert_erp_{Guid.NewGuid()}{ext}");
+                await File.WriteAllBytesAsync(tempPath, data, ct);
+
                 var importJobDto = await _dm.CreateImportJobAsync(
-                    org.Id, entityType, config.FileFormat, fileName, filePath, "batch-job", ct);
+                    org.Id, entityType, config.FileFormat, fileName, tempPath, "batch-job", ct);
 
                 await _dm.StageAsync(importJobDto.Id, ct);
                 await _dm.ValidateAsync(importJobDto.Id, ct);
@@ -232,19 +243,20 @@ public class BatchJobService : IBatchJobService
                 totalPromoted += importJob?.PromotedRows ?? 0;
                 totalFailed   += importJob?.InvalidRows  ?? 0;
 
-                // Move to processed
-                var dest = Path.Combine(config.LocalProcessedPath, $"{stamp}_{fileName}");
-                File.Move(filePath, dest, overwrite: true);
+                // Move to processed folder in Azure Files
+                await _fs.MoveAsync(inbox, fileName, processed, $"{stamp}_{fileName}", ct);
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error processing import file {File}", fileName);
                 errors.Add($"{fileName}: {ex.Message}");
-                try
-                {
-                    var errDest = Path.Combine(config.LocalErrorPath, $"{stamp}_{fileName}");
-                    File.Move(filePath, errDest, overwrite: true);
-                }
+                try { await _fs.MoveAsync(inbox, fileName, error, $"{stamp}_{fileName}", ct); }
                 catch { /* best effort */ }
+            }
+            finally
+            {
+                if (tempPath != null && File.Exists(tempPath))
+                    try { File.Delete(tempPath); } catch { }
             }
         }
 
@@ -295,36 +307,34 @@ public class BatchJobService : IBatchJobService
                 return new BatchJobRunResult(true, 0, 0, 0, "No new records to export.");
             }
 
-            var exportFolder = config.LocalExportPath?.Trim();
-            if (string.IsNullOrEmpty(exportFolder))
-                exportFolder = Path.Combine(config.LocalInboxPath, "..", "Export");
-
-            Directory.CreateDirectory(exportFolder);
-
-            var pattern  = config.ExportFileNamePattern
+            var exportPath = (config.LocalExportPath ?? $"exports/{entityType.ToLower()}s").Trim('/');
+            var pattern    = config.ExportFileNamePattern
                 ?? $"{entityType.ToLower()}-export-{{date}}.{config.FileFormat.ToLower()}";
-            var outName  = pattern.Replace("{date}", DateTime.UtcNow.ToString("yyyyMMdd_HHmmss"));
-            var outPath  = Path.Combine(exportFolder, outName);
+            var fileName   = pattern.Replace("{date}", DateTime.UtcNow.ToString("yyyyMMdd_HHmmss"));
 
-            await File.WriteAllBytesAsync(outPath, result.Data, ct);
+            // Upload directly to Azure File Share — no local disk needed
+            await _fs.UploadAsync(exportPath, fileName, result.Data, ct);
 
-            // Write audit rows for each exported entity
+            var fullPath = $"{exportPath}/{fileName}";
+
+            // Write audit rows
             foreach (var (entityId, entityRef) in result.ExportedEntities)
             {
                 _db.ExportJobRows.Add(new ExportJobRow(
-                    org.Id, config.Id, entityType, entityId, entityRef, outPath));
+                    org.Id, config.Id, entityType, entityId, entityRef, fullPath));
             }
 
             config.RecordRun(BatchJobRunStatus.Success,
-                $"Exported {result.EntityCount} record(s) to {outPath}",
+                $"Exported {result.EntityCount} record(s) → {fullPath}",
                 filesProcessed: 1, rowsPromoted: result.EntityCount);
             await _db.SaveChangesAsync(ct);
 
             return new BatchJobRunResult(true, 1, result.EntityCount, 0,
-                $"Exported {result.EntityCount} record(s) to: {outPath}");
+                $"Exported {result.EntityCount} record(s) to: {fullPath}");
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Export job failed for {EntityType}", entityType);
             config.RecordRun(BatchJobRunStatus.Failed, ex.Message);
             await _db.SaveChangesAsync(ct);
             return new BatchJobRunResult(false, 0, 0, 0, ex.Message);

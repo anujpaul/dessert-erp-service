@@ -7,6 +7,7 @@ using DessertERP.Application.Modules.DataManagement.Services;
 using DessertERP.Application.Modules.GeneralLedger.Services;
 using DessertERP.Application.Modules.Organization.Services;
 using DessertERP.Application.Modules.ProductManagement.Services;
+using DessertERP.Application.Modules.Retail.Services;
 using DessertERP.Application.Modules.SystemAdmin.Services;
 using DessertERP.Infrastructure.Persistence;
 using DessertERP.Infrastructure.Persistence.Seed;
@@ -20,9 +21,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-
-// Npgsql 8 requires DateTimeKind.Utc — this restores legacy behaviour
-AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,7 +50,9 @@ builder.Services.AddScoped<IProductManagementService, ProductManagementService>(
 // ── Data Management ───────────────────────────────────────────────────────────
 builder.Services.AddScoped<IDataManagementService, DataManagementService>();
 builder.Services.AddScoped<IBatchJobService, BatchJobService>();
+builder.Services.AddScoped<IRetailService, RetailService>();
 builder.Services.AddSingleton<IBlobStorageService, AzureBlobStorageService>();
+builder.Services.AddSingleton<IFileShareService, AzureFileShareService>();
 
 // ── Hangfire (server runs inside the API process) ─────────────────────────────
 builder.Services.AddHangfire(config =>

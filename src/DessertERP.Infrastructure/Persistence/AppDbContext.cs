@@ -5,6 +5,7 @@ using DessertERP.Domain.Modules.DataManagement;
 using DessertERP.Domain.Modules.GeneralLedger;
 using DessertERP.Domain.Modules.Organization;
 using DessertERP.Domain.Modules.ProductManagement;
+using DessertERP.Domain.Modules.Retail;
 using DessertERP.Domain.Modules.SystemAdmin;
 using Microsoft.EntityFrameworkCore;
 using PMProduct = DessertERP.Domain.Modules.ProductManagement.Product;
@@ -53,6 +54,15 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<PurchaseOrderLine>  PurchaseOrderLines => Set<PurchaseOrderLine>();
     public DbSet<APInvoice>          APInvoices         => Set<APInvoice>();
     public DbSet<APPayment>          APPayments         => Set<APPayment>();
+
+    // Retail
+    public DbSet<RetailStore>        RetailStores        => Set<RetailStore>();
+    public DbSet<POSTransaction>     POSTransactions     => Set<POSTransaction>();
+    public DbSet<POSTransactionLine> POSTransactionLines => Set<POSTransactionLine>();
+    public DbSet<POSPayment>         POSPayments         => Set<POSPayment>();
+    public DbSet<Promotion>          Promotions          => Set<Promotion>();
+    public DbSet<Coupon>             Coupons             => Set<Coupon>();
+    public DbSet<CouponRedemption>   CouponRedemptions   => Set<CouponRedemption>();
 
     // Data Management
     public DbSet<ImportJob>      ImportJobs      => Set<ImportJob>();
@@ -132,6 +142,22 @@ public class AppDbContext : DbContext, IAppDbContext
         modelBuilder.Entity<ImportJobRow>()
             .HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<BatchJobConfig>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+
+        // Retail — org-scoped, soft-delete
+        modelBuilder.Entity<RetailStore>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<POSTransaction>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<POSTransactionLine>()
+            .HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<POSPayment>()
+            .HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<Promotion>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<Coupon>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<CouponRedemption>()
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
 
         // System Admin — org-scoped, soft-delete

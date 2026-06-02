@@ -3,6 +3,7 @@ using DessertERP.Application.Modules.DataManagement.Services;
 using DessertERP.Infrastructure.Persistence;
 using DessertERP.Infrastructure.Services;
 using DessertERP.Infrastructure.Storage;
+using Microsoft.Extensions.Logging;
 using DessertERP.Worker.Jobs;
 using DessertERP.Worker.Workers;
 using Hangfire;
@@ -36,6 +37,7 @@ builder.Services.AddScoped<IBatchJobService, BatchJobService>();
 // For Azure App Service, set this in Configuration → Application Settings.
 // For local dev, use "UseDevelopmentStorage=true" with Azurite running.
 builder.Services.AddSingleton<IBlobStorageService, AzureBlobStorageService>();
+builder.Services.AddSingleton<IFileShareService, AzureFileShareService>();
 
 // ── Hangfire ──────────────────────────────────────────────────────────────────
 builder.Services.AddHangfire(config =>

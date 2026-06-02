@@ -4,6 +4,7 @@ using DessertERP.Domain.Modules.DataManagement;
 using DessertERP.Domain.Modules.GeneralLedger;
 using DessertERP.Domain.Modules.Organization;
 using DessertERP.Domain.Modules.ProductManagement;
+using DessertERP.Domain.Modules.Retail;
 using DessertERP.Domain.Modules.SystemAdmin;
 using Microsoft.EntityFrameworkCore;
 
@@ -55,6 +56,15 @@ public interface IAppDbContext
     DbSet<ImportJobRow>   ImportJobRows   { get; }
     DbSet<ExportJobRow>   ExportJobRows   { get; }
     DbSet<BatchJobConfig> BatchJobConfigs { get; }
+
+    // Retail
+    DbSet<RetailStore>        RetailStores        { get; }
+    DbSet<POSTransaction>     POSTransactions     { get; }
+    DbSet<POSTransactionLine> POSTransactionLines { get; }
+    DbSet<POSPayment>         POSPayments         { get; }
+    DbSet<Promotion>          Promotions          { get; }
+    DbSet<Coupon>             Coupons             { get; }
+    DbSet<CouponRedemption>   CouponRedemptions   { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

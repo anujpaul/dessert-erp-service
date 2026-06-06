@@ -1680,6 +1680,15 @@ namespace DessertERP.Infrastructure.Migrations
                     b.Property<Guid?>("ParentCategoryId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("TaxCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<decimal>("TaxRate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric(8,4)")
+                        .HasDefaultValue(0m);
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp without time zone");
 
@@ -1750,9 +1759,6 @@ namespace DessertERP.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("CategoryId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp without time zone");
 
@@ -1789,8 +1795,8 @@ namespace DessertERP.Infrastructure.Migrations
 
                     b.Property<string>("PriceType")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<int>("Priority")
                         .HasColumnType("integer");
@@ -1812,11 +1818,9 @@ namespace DessertERP.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CategoryId");
+                    b.HasIndex("ProductId", "PriceType", "IsActive");
 
-                    b.HasIndex("ProductId");
-
-                    b.HasIndex("VariantId");
+                    b.HasIndex("VariantId", "PriceType", "IsActive");
 
                     b.HasIndex("OrganizationId", "IsActive", "StartDate", "EndDate");
 
@@ -1905,7 +1909,7 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<decimal>("TaxRate")
+                    b.Property<decimal?>("TaxRateOverride")
                         .HasColumnType("numeric(8,4)");
 
                     b.Property<string>("UnitOfMeasure")
@@ -2940,11 +2944,6 @@ namespace DessertERP.Infrastructure.Migrations
 
             modelBuilder.Entity("DessertERP.Domain.Modules.ProductManagement.PriceAgreement", b =>
                 {
-                    b.HasOne("DessertERP.Domain.Modules.ProductManagement.Category", "Category")
-                        .WithMany()
-                        .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("DessertERP.Domain.Modules.ProductManagement.Product", "Product")
                         .WithMany()
                         .HasForeignKey("ProductId")
@@ -2954,8 +2953,6 @@ namespace DessertERP.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("VariantId")
                         .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Category");
 
                     b.Navigation("Product");
 

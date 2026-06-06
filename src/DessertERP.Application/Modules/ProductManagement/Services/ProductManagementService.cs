@@ -79,7 +79,8 @@ public class ProductManagementService : IProductManagementService
             c.Id, c.Code, c.Name, c.Description, c.ParentCategoryId,
             c.ParentCategoryId.HasValue && catIndex.TryGetValue(c.ParentCategoryId.Value, out var pn) ? pn : null,
             c.DisplayOrder, c.IsActive,
-            productCounts.GetValueOrDefault(c.Id, 0)));
+            productCounts.GetValueOrDefault(c.Id, 0),
+            c.TaxRate, c.TaxCode));
     }
 
     public async Task<CategoryDto> CreateCategoryAsync(CreateCategoryRequest req, CancellationToken ct = default)
@@ -89,11 +90,13 @@ public class ProductManagementService : IProductManagementService
         if (exists) throw new InvalidOperationException($"Category code '{req.Code}' already exists.");
 
         var cat = new Category(_org.OrganizationId, req.Code, req.Name,
-            req.ParentCategoryId, req.Description, req.DisplayOrder);
+            req.ParentCategoryId, req.Description, req.DisplayOrder,
+            req.TaxRate, req.TaxCode);
         _db.Categories.Add(cat);
         await _db.SaveChangesAsync(ct);
         return new CategoryDto(cat.Id, cat.Code, cat.Name, cat.Description,
-            cat.ParentCategoryId, null, cat.DisplayOrder, cat.IsActive, 0);
+            cat.ParentCategoryId, null, cat.DisplayOrder, cat.IsActive, 0,
+            cat.TaxRate, cat.TaxCode);
     }
 
     public async Task DeleteCategoryAsync(Guid id, CancellationToken ct = default)
@@ -231,8 +234,9 @@ public class ProductManagementService : IProductManagementService
 
         var product = new Domain.Modules.ProductManagement.Product(
             _org.OrganizationId, req.Sku, req.Name, req.CategoryId,
-            pt, req.BasePrice, req.BaseCost, req.TaxRate,
-            req.UnitOfMeasure, req.BrandId, gt, req.Description, req.Tags, req.Currency);
+            pt, req.BasePrice, req.BaseCost,
+            req.UnitOfMeasure, req.BrandId, gt, req.Description, req.Tags, req.Currency,
+            taxRateOverride: req.TaxRateOverride);
 
         _db.CatalogProducts.Add(product);
         await _db.SaveChangesAsync(ct);
@@ -251,7 +255,8 @@ public class ProductManagementService : IProductManagementService
 
         p.Update(req.Name, req.Description, req.LongDescription,
             req.CategoryId, req.BrandId, req.BasePrice, req.BaseCost,
-            req.TaxRate, pt, gt, req.Tags, req.ImageUrl);
+            pt, gt, req.Tags, req.ImageUrl,
+            taxRateOverride: req.TaxRateOverride);
         await _db.SaveChangesAsync(ct);
     }
 
@@ -423,7 +428,7 @@ public class ProductManagementService : IProductManagementService
             v.Size, v.Color, v.Material,
             v.EffectivePrice(v.Product?.BasePrice ?? 0),
             v.EffectiveCost(v.Product?.BaseCost ?? 0),
-            v.Product?.TaxRate ?? 0,
+            v.Product?.EffectiveTaxRate(v.Product?.Category?.TaxRate ?? 0) ?? 0,
             v.Product?.UnitOfMeasure ?? "Each",
             v.Inventory?.QuantityAvailable ?? 0,
             v.Product?.PreferredVendorId,
@@ -435,16 +440,25 @@ public class ProductManagementService : IProductManagementService
 
     private static ProductDto MapProduct(
         Domain.Modules.ProductManagement.Product p,
-        string? preferredVendorName = null) => new(
-        p.Id, p.Sku, p.Name, p.Description, p.LongDescription,
-        p.CategoryId, p.Category?.Name ?? "—",
-        p.BrandId, p.Brand?.Name,
-        p.ProductType.ToString(), p.GenderTarget.ToString(),
-        p.UnitOfMeasure, p.BasePrice, p.BaseCost, p.TaxRate, p.Currency,
-        p.Tags, p.ImageUrl, p.Status.ToString(),
-        p.PreferredVendorId, preferredVendorName,
-        p.CreatedAt,
-        p.Variants.Select(v => MapVariant(v, v.Inventory, p.BasePrice, p.BaseCost)));
+        string? preferredVendorName = null)
+    {
+        var catTaxRate = p.Category?.TaxRate ?? 0m;
+        return new(
+            p.Id, p.Sku, p.Name, p.Description, p.LongDescription,
+            p.CategoryId, p.Category?.Name ?? "—",
+            p.BrandId, p.Brand?.Name,
+            p.ProductType.ToString(), p.GenderTarget.ToString(),
+            p.UnitOfMeasure, p.BasePrice, p.BaseCost,
+            EffectiveTaxRate: p.EffectiveTaxRate(catTaxRate),
+            TaxRateOverride:  p.TaxRateOverride,
+            CategoryTaxRate:  catTaxRate,
+            CategoryTaxCode:  p.Category?.TaxCode,
+            p.Currency,
+            p.Tags, p.ImageUrl, p.Status.ToString(),
+            p.PreferredVendorId, preferredVendorName,
+            p.CreatedAt,
+            p.Variants.Select(v => MapVariant(v, v.Inventory, p.BasePrice, p.BaseCost)));
+    }
 
     private static ProductVariantDto MapVariant(
         ProductVariant v, InventoryRecord? inv,

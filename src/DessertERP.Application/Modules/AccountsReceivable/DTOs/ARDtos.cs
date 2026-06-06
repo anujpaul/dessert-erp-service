@@ -40,6 +40,8 @@ public record AddSalesOrderLineRequest(
 
 public record ShipOrderRequest(DateTime ShipDate);
 
+public record ApplyDiscountRequest(decimal DiscountPct);
+
 // ── AR Invoice ────────────────────────────────────────────────────────────────
 public record ARInvoiceDto(Guid Id, string InvoiceNumber, Guid CustomerId,
     string CustomerName, Guid? SalesOrderId, string? SalesOrderNumber,

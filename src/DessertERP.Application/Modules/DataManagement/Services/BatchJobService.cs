@@ -170,7 +170,11 @@ public class BatchJobService : IBatchJobService
 
     public async Task<BatchJobRunResult> RunImportJobAsync(Guid jobConfigId, CancellationToken ct = default)
     {
-        var config = await _db.BatchJobConfigs.FirstOrDefaultAsync(j => j.Id == jobConfigId, ct)
+        // IgnoreQueryFilters: background jobs run without an HTTP context, so
+        // ICurrentOrganizationService returns Guid.Empty — the org-scoped query
+        // filter would otherwise hide every row. The jobConfigId is already exact.
+        var config = await _db.BatchJobConfigs.IgnoreQueryFilters()
+                         .FirstOrDefaultAsync(j => j.Id == jobConfigId && !j.IsDeleted, ct)
             ?? throw new InvalidOperationException("Batch job config not found.");
 
         if (!config.IsEnabled)
@@ -278,7 +282,8 @@ public class BatchJobService : IBatchJobService
 
     public async Task<BatchJobRunResult> RunExportJobAsync(Guid jobConfigId, CancellationToken ct = default)
     {
-        var config = await _db.BatchJobConfigs.FirstOrDefaultAsync(j => j.Id == jobConfigId, ct)
+        var config = await _db.BatchJobConfigs.IgnoreQueryFilters()
+                         .FirstOrDefaultAsync(j => j.Id == jobConfigId && !j.IsDeleted, ct)
             ?? throw new InvalidOperationException("Batch job config not found.");
 
         if (!config.IsEnabled)

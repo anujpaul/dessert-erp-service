@@ -22,6 +22,10 @@ public class BatchJobSchedulerWorker : BackgroundService
     private readonly ILogger<BatchJobSchedulerWorker> _logger;
     private static readonly TimeSpan SyncInterval = TimeSpan.FromSeconds(60);
 
+    // Tracks every batch-job-* ID we have ever registered so we can remove orphans
+    // when a config is deleted between sync cycles.
+    private readonly HashSet<string> _registeredJobIds = [];
+
     public BatchJobSchedulerWorker(IServiceScopeFactory scopeFactory,
         ILogger<BatchJobSchedulerWorker> logger)
     {
@@ -56,14 +60,26 @@ public class BatchJobSchedulerWorker : BackgroundService
                 .Where(j => !j.IsDeleted)
                 .ToListAsync(ct);
 
+            // Build the set of job IDs that should exist in Hangfire
+            var activeJobIds = configs.Select(c => $"batch-job-{c.Id}").ToHashSet();
+
+            // Remove recurring jobs we previously registered that are no longer in the DB
+            // (covers the case where a config was deleted between sync cycles)
+            foreach (var staleId in _registeredJobIds.Where(id => !activeJobIds.Contains(id)).ToList())
+            {
+                RecurringJob.RemoveIfExists(staleId);
+                _registeredJobIds.Remove(staleId);
+                _logger.LogInformation("Removed orphaned Hangfire recurring job: {JobId}", staleId);
+            }
+
             foreach (var config in configs)
             {
                 var hangfireJobId = $"batch-job-{config.Id}";
 
                 if (!config.IsEnabled)
                 {
-                    // Remove the recurring job if it was registered
                     RecurringJob.RemoveIfExists(hangfireJobId);
+                    _registeredJobIds.Remove(hangfireJobId);
                     continue;
                 }
 
@@ -84,6 +100,7 @@ public class BatchJobSchedulerWorker : BackgroundService
                         config.CronExpression,
                         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
                 }
+                _registeredJobIds.Add(hangfireJobId);
             }
 
             _logger.LogDebug("Synced {Count} batch job(s) to Hangfire.", configs.Count);

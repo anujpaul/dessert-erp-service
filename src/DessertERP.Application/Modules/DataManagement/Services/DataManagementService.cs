@@ -467,12 +467,12 @@ public class DataManagementService : IDataManagementService
                 catId, pt,
                 GetDecimal(d, ProductFields.BasePrice),
                 GetDecimal(d, ProductFields.BaseCost),
-                GetDecimal(d, ProductFields.TaxRate),
                 GetOr(d, ProductFields.UnitOfMeasure, "Each"),
                 brandId, gt,
                 Get(d, ProductFields.Description),
                 Get(d, ProductFields.Tags),
-                GetOr(d, ProductFields.Currency, "USD"));
+                GetOr(d, ProductFields.Currency, "USD"),
+                GetDecimalN(d, ProductFields.TaxRate));  // optional per-product override; null = inherit from category
 
             _db.CatalogProducts.Add(product);
 
@@ -739,7 +739,7 @@ public class DataManagementService : IDataManagementService
             [ProductFields.GenderTarget]  = p.GenderTarget.ToString(),
             [ProductFields.BasePrice]     = p.BasePrice.ToString(CultureInfo.InvariantCulture),
             [ProductFields.BaseCost]      = p.BaseCost.ToString(CultureInfo.InvariantCulture),
-            [ProductFields.TaxRate]       = p.TaxRate.ToString(CultureInfo.InvariantCulture),
+            [ProductFields.TaxRate]       = p.TaxRateOverride?.ToString(CultureInfo.InvariantCulture) ?? "",
             [ProductFields.UnitOfMeasure] = p.UnitOfMeasure,
             [ProductFields.Currency]      = p.Currency,
             [ProductFields.Tags]          = p.Tags,
@@ -1047,34 +1047,159 @@ public class DataManagementService : IDataManagementService
     private async Task<ExportUnexportedResult> ExportUnexportedSalesOrdersAsync(
         Guid orgId, FileFormat ff, CancellationToken ct)
     {
-        var orders   = await _db.SalesOrders.Where(o => o.OrganizationId == orgId && !o.IsExported)
-                           .Include(o => o.Lines).ToListAsync(ct);
-        var custNums = await _db.Customers.Where(c => c.OrganizationId == orgId)
-                           .ToDictionaryAsync(c => c.Id, c => c.CustomerNumber, ct);
+        var orders = await _db.SalesOrders
+                        .Where(o => o.OrganizationId == orgId && !o.IsExported
+                            && o.Status == SalesOrderStatus.Shipped)
+                        .Include(o => o.Lines)
+                        .ToListAsync(ct);
 
-        var rows = orders.SelectMany(o => o.Lines.Select(l => new Dictionary<string, string?>
-        {
-            [SalesOrderFields.CustomerNumber]    = custNums.TryGetValue(o.CustomerId, out var cn) ? cn : null,
-            [SalesOrderFields.OrderDate]         = o.OrderDate.ToString("yyyy-MM-dd"),
-            [SalesOrderFields.RequestedShipDate] = o.RequestedShipDate?.ToString("yyyy-MM-dd"),
-            [SalesOrderFields.Description]       = o.Description,
-            [SalesOrderFields.CustomerRef]       = o.CustomerRef,
-            [SalesOrderFields.Currency]          = o.Currency,
-            [SalesOrderFields.VariantSku]        = l.Sku,
-            [SalesOrderFields.Quantity]          = l.Quantity.ToString(),
-            [SalesOrderFields.UnitPrice]         = l.UnitPrice.ToString(),
-            [SalesOrderFields.DiscountPct]       = l.DiscountPct.ToString(),
-            [SalesOrderFields.TaxRate]           = l.TaxRate.ToString(),
-        })).ToList();
+        var customers = await _db.Customers
+                            .Where(c => c.OrganizationId == orgId)
+                            .ToDictionaryAsync(c => c.Id, ct);
 
-        var data = SerializeRows(rows, SalesOrderFields.All, ff, "SalesOrder", "SalesOrders");
+        var payments = await _db.ARPayments
+                            .Include(p => p.ARInvoice)
+                            .Where(p => p.OrganizationId == orgId && !p.IsDeleted)
+                            .ToListAsync(ct);
+        var paymentsByOrder = payments
+                            .Where(p => p.ARInvoice?.SalesOrderId != null)
+                            .GroupBy(p => p.ARInvoice!.SalesOrderId!.Value)
+                            .ToDictionary(g => g.Key, g => g.ToList());
+
+        // XML gets the full hierarchical format; CSV/JSON stay flat
+        byte[] data = ff == FileFormat.Xml
+            ? SerializeSalesOrdersXml(orders, customers, paymentsByOrder)
+            : SerializeRows(
+                orders.SelectMany(o => o.Lines.Where(l => !l.IsDeleted).Select(l =>
+                {
+                    customers.TryGetValue(o.CustomerId, out var cust);
+                    return new Dictionary<string, string?>
+                    {
+                        [SalesOrderFields.OrderNumber]       = o.OrderNumber,
+                        [SalesOrderFields.CustomerNumber]    = cust?.CustomerNumber,
+                        [SalesOrderFields.OrderDate]         = o.OrderDate.ToString("yyyy-MM-dd"),
+                        [SalesOrderFields.RequestedShipDate] = o.RequestedShipDate?.ToString("yyyy-MM-dd"),
+                        [SalesOrderFields.Description]       = o.Description,
+                        [SalesOrderFields.CustomerRef]       = o.CustomerRef,
+                        [SalesOrderFields.Currency]          = o.Currency,
+                        [SalesOrderFields.VariantSku]        = l.Sku,
+                        [SalesOrderFields.Quantity]          = l.Quantity.ToString(),
+                        [SalesOrderFields.UnitPrice]         = l.UnitPrice.ToString(),
+                        [SalesOrderFields.DiscountPct]       = l.DiscountPct.ToString(),
+                        [SalesOrderFields.TaxRate]           = l.TaxRate.ToString(),
+                    };
+                })).ToList(),
+                SalesOrderFields.All, ff, "SalesOrder", "SalesOrders");
+
         var entities = orders.Select(o => (o.Id, (string)o.OrderNumber)).ToList();
-
-        // Stamp
         foreach (var o in orders) o.MarkExported();
         await _db.SaveChangesAsync(ct);
 
         return new ExportUnexportedResult(data, $"sales-orders-export.{FormatExt(ff)}", ContentTypeFor(ff), orders.Count, entities);
+    }
+
+    /// <summary>
+    /// Hierarchical XML export — one &lt;SalesOrder&gt; per order with nested
+    /// Header, Customer, Lines, Totals, Tax and Payments sections.
+    /// </summary>
+    private static byte[] SerializeSalesOrdersXml(
+        List<Domain.Modules.AccountsReceivable.SalesOrder> orders,
+        Dictionary<Guid, Domain.Modules.AccountsReceivable.Customer> customers,
+        Dictionary<Guid, List<Domain.Modules.AccountsReceivable.ARPayment>> paymentsByOrder)
+    {
+        var doc = new XDocument(
+            new XDeclaration("1.0", "utf-8", null),
+            new XElement("SalesOrders",
+                new XAttribute("exportedAt", DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")),
+                orders.Select(o =>
+                {
+                    customers.TryGetValue(o.CustomerId, out var cust);
+                    var lines      = o.Lines.Where(l => !l.IsDeleted).ToList();
+                    var subTotal   = lines.Sum(l => l.LineSubTotal);
+                    var discTotal  = lines.Sum(l => l.DiscountAmount);
+                    var taxTotal   = lines.Sum(l => l.TaxAmount);
+                    var grandTotal = lines.Sum(l => l.LineTotal);
+                    paymentsByOrder.TryGetValue(o.Id, out var pmts);
+                    var paidAmount = (pmts ?? []).Sum(p => p.Amount);
+
+                    return new XElement("SalesOrder",
+
+                        new XElement("Header",
+                            new XElement("OrderNumber",       o.OrderNumber),
+                            new XElement("Status",            o.Status.ToString()),
+                            new XElement("OrderDate",         o.OrderDate.ToString("yyyy-MM-dd")),
+                            new XElement("RequestedShipDate", o.RequestedShipDate?.ToString("yyyy-MM-dd") ?? ""),
+                            new XElement("ActualShipDate",    o.ActualShipDate?.ToString("yyyy-MM-dd") ?? ""),
+                            new XElement("CustomerRef",       o.CustomerRef ?? ""),
+                            new XElement("Description",       o.Description ?? ""),
+                            new XElement("Currency",          o.Currency)
+                        ),
+
+                        new XElement("Customer",
+                            new XElement("CustomerNumber",    cust?.CustomerNumber ?? ""),
+                            new XElement("Name",              cust?.Name ?? ""),
+                            new XElement("Email",             cust?.Email ?? ""),
+                            new XElement("Phone",             cust?.Phone ?? ""),
+                            new XElement("Address",           cust?.Address ?? ""),
+                            new XElement("PaymentTermsDays",  cust?.PaymentTermsDays.ToString() ?? "")
+                        ),
+
+                        new XElement("Lines",
+                            lines.Select(l => new XElement("SalesOrderLine",
+                                new XElement("Sku",            l.Sku),
+                                new XElement("ProductName",    l.ProductName),
+                                new XElement("Variant",        l.VariantDescription ?? ""),
+                                new XElement("UnitOfMeasure",  l.UnitOfMeasure),
+                                new XElement("Quantity",       l.Quantity.ToString("F4")),
+                                new XElement("UnitPrice",      l.UnitPrice.ToString("F4")),
+                                new XElement("DiscountPct",    l.DiscountPct.ToString("F4")),
+                                new XElement("DiscountAmount", l.DiscountAmount.ToString("F4")),
+                                new XElement("TaxRate",        l.TaxRate.ToString("F4")),
+                                new XElement("TaxAmount",      l.TaxAmount.ToString("F4")),
+                                new XElement("LineTotal",      l.LineTotal.ToString("F4"))
+                            ))
+                        ),
+
+                        new XElement("Totals",
+                            new XElement("SubTotal",      subTotal.ToString("F4")),
+                            new XElement("DiscountTotal", discTotal.ToString("F4")),
+                            new XElement("TaxTotal",      taxTotal.ToString("F4")),
+                            new XElement("GrandTotal",    grandTotal.ToString("F4")),
+                            new XElement("PaidAmount",    paidAmount.ToString("F4")),
+                            new XElement("BalanceDue",    (grandTotal - paidAmount).ToString("F4"))
+                        ),
+
+                        new XElement("Tax",
+                            new XElement("Jurisdiction", ""),
+                            new XElement("State",        ""),
+                            new XElement("Zip",          ""),
+                            new XElement("TaxTotal",     taxTotal.ToString("F4"))
+                        ),
+
+                        new XElement("Payments",
+                            (pmts ?? []).Select(p => new XElement("Payment",
+                                new XElement("PaymentNumber", p.PaymentNumber),
+                                new XElement("PaymentDate",   p.PaymentDate.ToString("yyyy-MM-dd")),
+                                new XElement("Method",        p.PaymentMethod.ToString()),
+                                new XElement("Amount",        p.Amount.ToString("F4")),
+                                new XElement("Reference",     p.Reference ?? ""),
+                                new XElement("Status",        p.Status.ToString())
+                            ))
+                        )
+                    );
+                })
+            )
+        );
+
+        using var ms = new MemoryStream();
+        using (var writer = System.Xml.XmlWriter.Create(ms, new System.Xml.XmlWriterSettings
+        {
+            Indent      = true,
+            IndentChars = "\t",
+            Encoding    = new System.Text.UTF8Encoding(false)
+        }))
+            doc.Save(writer);
+        return ms.ToArray();
     }
 
     private async Task<ExportUnexportedResult> ExportUnexportedPurchaseOrdersAsync(
@@ -1154,7 +1279,7 @@ public class DataManagementService : IDataManagementService
             [ProductFields.GenderTarget]  = p.GenderTarget.ToString(),
             [ProductFields.BasePrice]     = p.BasePrice.ToString(),
             [ProductFields.BaseCost]      = p.BaseCost.ToString(),
-            [ProductFields.TaxRate]       = p.TaxRate.ToString(),
+            [ProductFields.TaxRate]       = p.TaxRateOverride?.ToString() ?? "",
             [ProductFields.UnitOfMeasure] = p.UnitOfMeasure,
             [ProductFields.Currency]      = p.Currency,
             [ProductFields.Tags]          = p.Tags,

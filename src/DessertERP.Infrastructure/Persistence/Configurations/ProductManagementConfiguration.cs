@@ -14,6 +14,8 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
         b.Property(e => e.Code).HasMaxLength(30).IsRequired();
         b.Property(e => e.Name).HasMaxLength(200).IsRequired();
         b.Property(e => e.Description).HasMaxLength(500);
+        b.Property(e => e.TaxRate).HasColumnType("numeric(8,4)").HasDefaultValue(0m);
+        b.Property(e => e.TaxCode).HasMaxLength(30);   // e.g. CLOTHING, FOOTWEAR, FOOD_EXEMPT
         b.HasIndex(e => new { e.OrganizationId, e.Code }).IsUnique();
         b.HasOne(e => e.ParentCategory).WithMany()
             .HasForeignKey(e => e.ParentCategoryId).OnDelete(DeleteBehavior.Restrict);
@@ -52,7 +54,8 @@ public class CatalogProductConfiguration : IEntityTypeConfiguration<Product>
         b.Property(e => e.UnitOfMeasure).HasMaxLength(20);
         b.Property(e => e.BasePrice).HasColumnType("numeric(18,4)");
         b.Property(e => e.BaseCost).HasColumnType("numeric(18,4)");
-        b.Property(e => e.TaxRate).HasColumnType("numeric(8,4)");
+        // Nullable override — null means "inherit from category"
+        b.Property(e => e.TaxRateOverride).HasColumnType("numeric(8,4)").IsRequired(false);
         b.Property(e => e.Currency).HasMaxLength(3);
         b.Property(e => e.Tags).HasMaxLength(500);
         b.Property(e => e.ImageUrl).HasMaxLength(500);

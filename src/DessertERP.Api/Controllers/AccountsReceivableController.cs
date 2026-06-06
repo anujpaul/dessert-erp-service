@@ -61,6 +61,14 @@ public class AccountsReceivableController : ControllerBase
         catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
     }
 
+    /// <summary>Apply a flat discount % to every line on a Draft order (used by coupon application).</summary>
+    [HttpPost("sales-orders/{id:guid}/apply-discount")]
+    public async Task<IActionResult> ApplyDiscount(Guid id, [FromBody] ApplyDiscountRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.ApplyDiscountToOrderAsync(id, req.DiscountPct, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
     [HttpPost("sales-orders/{id:guid}/confirm")]
     public async Task<IActionResult> Confirm(Guid id, CancellationToken ct)
     {

@@ -5,6 +5,7 @@ using DessertERP.Domain.Modules.DataManagement;
 using DessertERP.Domain.Modules.GeneralLedger;
 using DessertERP.Domain.Modules.Organization;
 using DessertERP.Domain.Modules.ProductManagement;
+using DessertERP.Domain.Modules.Marketing;
 using DessertERP.Domain.Modules.Retail;
 using DessertERP.Domain.Modules.SystemAdmin;
 using Microsoft.EntityFrameworkCore;
@@ -63,6 +64,14 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<Promotion>          Promotions          => Set<Promotion>();
     public DbSet<Coupon>             Coupons             => Set<Coupon>();
     public DbSet<CouponRedemption>   CouponRedemptions   => Set<CouponRedemption>();
+
+    // Marketing
+    public DbSet<Campaign>                Campaigns               => Set<Campaign>();
+    public DbSet<LoyaltyProgram>          LoyaltyPrograms         => Set<LoyaltyProgram>();
+    public DbSet<CustomerLoyaltyAccount>  CustomerLoyaltyAccounts => Set<CustomerLoyaltyAccount>();
+
+    // Trade / Price Agreements
+    public DbSet<PriceAgreement> PriceAgreements => Set<PriceAgreement>();
 
     // Data Management
     public DbSet<ImportJob>      ImportJobs      => Set<ImportJob>();
@@ -159,6 +168,18 @@ public class AppDbContext : DbContext, IAppDbContext
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<CouponRedemption>()
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+
+        // Marketing — org-scoped, no soft-delete on domain entities (use IsActive)
+        modelBuilder.Entity<Campaign>()
+            .HasQueryFilter(e => _orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId);
+        modelBuilder.Entity<LoyaltyProgram>()
+            .HasQueryFilter(e => _orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId);
+        modelBuilder.Entity<CustomerLoyaltyAccount>()
+            .HasQueryFilter(e => _orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId);
+
+        // Price Agreements — org-scoped, no soft-delete
+        modelBuilder.Entity<PriceAgreement>()
+            .HasQueryFilter(e => _orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId);
 
         // System Admin — org-scoped, soft-delete
         modelBuilder.Entity<AppUser>()

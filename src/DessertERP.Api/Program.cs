@@ -1,11 +1,17 @@
 using System.Text;
 using System.Text.Json.Serialization;
+using Microsoft.OpenApi.Models;
+
+
+
 using DessertERP.Application.Common.Interfaces;
 using DessertERP.Application.Modules.AccountsPayable.Services;
 using DessertERP.Application.Modules.AccountsReceivable.Services;
 using DessertERP.Application.Modules.DataManagement.Services;
 using DessertERP.Application.Modules.GeneralLedger.Services;
 using DessertERP.Application.Modules.Organization.Services;
+using DessertERP.Application.Modules.ProductManagement.Services;
+using DessertERP.Application.Modules.Marketing.Services;
 using DessertERP.Application.Modules.ProductManagement.Services;
 using DessertERP.Application.Modules.Retail.Services;
 using DessertERP.Application.Modules.SystemAdmin.Services;
@@ -20,12 +26,20 @@ using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
+//using Microsoft.OpenApi.Models;
+
+
+
+// ── Npgsql: treat DateTime(Unspecified) as UTC globally ──────────────────────
+// Angular sends dates as ISO strings (e.g. "2026-06-02") which .NET deserializes
+// as Kind=Unspecified. Npgsql 6+ requires Kind=Utc for timestamptz columns.
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ── HTTP Context (needed for CurrentOrganizationService) ─────────────────────
 builder.Services.AddHttpContextAccessor();
+
 
 // ── Database ──────────────────────────────────────────────────────────────────
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -51,6 +65,8 @@ builder.Services.AddScoped<IProductManagementService, ProductManagementService>(
 builder.Services.AddScoped<IDataManagementService, DataManagementService>();
 builder.Services.AddScoped<IBatchJobService, BatchJobService>();
 builder.Services.AddScoped<IRetailService, RetailService>();
+builder.Services.AddScoped<IMarketingService, MarketingService>();
+builder.Services.AddScoped<IPriceAgreementService, PriceAgreementService>();
 builder.Services.AddSingleton<IBlobStorageService, AzureBlobStorageService>();
 builder.Services.AddSingleton<IFileShareService, AzureFileShareService>();
 

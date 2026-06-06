@@ -11,15 +11,19 @@ public record CategoryDto(
     string? ParentCategoryName,
     int DisplayOrder,
     bool IsActive,
-    int ProductCount
+    int ProductCount,
+    decimal TaxRate,       // default tax rate for all products in this category
+    string? TaxCode        // e.g. CLOTHING, FOOTWEAR, FOOD_EXEMPT — for future tax engine
 );
 
 public record CreateCategoryRequest(
     string Code,
     string Name,
-    string? Description = null,
-    Guid? ParentCategoryId = null,
-    int DisplayOrder = 0
+    string? Description     = null,
+    Guid?   ParentCategoryId = null,
+    int     DisplayOrder    = 0,
+    decimal TaxRate         = 0,
+    string? TaxCode         = null
 );
 
 // ── Brand ─────────────────────────────────────────────────────────────────────
@@ -76,7 +80,10 @@ public record ProductDto(
     string UnitOfMeasure,
     decimal BasePrice,
     decimal BaseCost,
-    decimal TaxRate,
+    decimal EffectiveTaxRate,       // resolved: override if set, else category rate
+    decimal? TaxRateOverride,       // null = inherited from category
+    decimal CategoryTaxRate,        // the category's default rate (for display)
+    string? CategoryTaxCode,        // e.g. CLOTHING, FOOTWEAR
     string Currency,
     string? Tags,
     string? ImageUrl,
@@ -94,13 +101,13 @@ public record CreateProductRequest(
     string ProductType,
     decimal BasePrice,
     decimal BaseCost,
-    decimal TaxRate,
     string UnitOfMeasure = "Each",
     Guid? BrandId = null,
     string GenderTarget = "Unisex",
     string? Description = null,
     string? Tags = null,
-    string Currency = "USD"
+    string Currency = "USD",
+    decimal? TaxRateOverride = null   // leave null to inherit from category
 );
 
 public record UpdateProductRequest(
@@ -111,11 +118,11 @@ public record UpdateProductRequest(
     Guid? BrandId,
     decimal BasePrice,
     decimal BaseCost,
-    decimal TaxRate,
     string ProductType,
     string GenderTarget,
     string? Tags,
-    string? ImageUrl
+    string? ImageUrl,
+    decimal? TaxRateOverride = null   // leave null to inherit from category
 );
 
 // ── Variant ───────────────────────────────────────────────────────────────────

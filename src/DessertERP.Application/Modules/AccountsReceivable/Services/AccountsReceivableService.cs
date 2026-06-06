@@ -18,6 +18,7 @@ public interface IAccountsReceivableService
     Task<SalesOrderDto> CreateSalesOrderAsync(CreateSalesOrderRequest req, CancellationToken ct = default);
     Task<SalesOrderDto> AddSalesOrderLineAsync(Guid orderId, AddSalesOrderLineRequest req, CancellationToken ct = default);
     Task RemoveSalesOrderLineAsync(Guid orderId, Guid lineId, CancellationToken ct = default);
+    Task<SalesOrderDto> ApplyDiscountToOrderAsync(Guid orderId, decimal discountPct, CancellationToken ct = default);
     Task ConfirmSalesOrderAsync(Guid id, CancellationToken ct = default);
     Task StartPickingAsync(Guid id, CancellationToken ct = default);
     Task ShipSalesOrderAsync(Guid id, ShipOrderRequest req, CancellationToken ct = default);
@@ -120,13 +121,14 @@ public class AccountsReceivableService : IAccountsReceivableService
 
         var variant = await _db.ProductVariants
             .IgnoreQueryFilters()
-            .Include(v => v.Product)
+            .Include(v => v.Product).ThenInclude(p => p!.Category)
             .FirstOrDefaultAsync(v => v.Id == req.ProductVariantId && !v.IsDeleted, ct)
             ?? throw new InvalidOperationException("Product variant not found.");
 
         var product = variant.Product
             ?? throw new InvalidOperationException("Product not found for variant.");
         var unitPrice = req.OverrideUnitPrice ?? variant.EffectivePrice(product.BasePrice);
+        var effectiveTaxRate = product.EffectiveTaxRate(product.Category?.TaxRate ?? 0m);
         var variantDesc = string.Join(", ", new[] { variant.Size, variant.Color, variant.Material }
             .Where(s => !string.IsNullOrWhiteSpace(s)));
 
@@ -135,7 +137,7 @@ public class AccountsReceivableService : IAccountsReceivableService
         // avoids concurrency exceptions from collection-change-tracking with query filters.
         var line = order.AddLine(variant.Id, variant.Sku, product.Name,
             string.IsNullOrEmpty(variantDesc) ? null : variantDesc,
-            product.UnitOfMeasure, req.Quantity, unitPrice, product.TaxRate, req.DiscountPct);
+            product.UnitOfMeasure, req.Quantity, unitPrice, effectiveTaxRate, req.DiscountPct);
         _db.SalesOrderLines.Add(line);
         await _db.SaveChangesAsync(ct);
 
@@ -164,6 +166,34 @@ public class AccountsReceivableService : IAccountsReceivableService
         order.RecalcTotalsFromLines(remaining);
 
         await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<SalesOrderDto> ApplyDiscountToOrderAsync(Guid orderId, decimal discountPct, CancellationToken ct = default)
+    {
+        var order = await _db.SalesOrders
+            .FirstOrDefaultAsync(o => o.Id == orderId && !o.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Sales order not found.");
+
+        if (order.Status != SalesOrderStatus.Draft)
+            throw new InvalidOperationException("Discount can only be applied to Draft orders.");
+
+        if (discountPct < 0 || discountPct > 100)
+            throw new InvalidOperationException("Discount percentage must be between 0 and 100.");
+
+        // Apply the discount to every active line using the existing Update() method.
+        var lines = await _db.SalesOrderLines
+            .Where(l => l.SalesOrderId == orderId && !l.IsDeleted)
+            .ToListAsync(ct);
+
+        foreach (var line in lines)
+            line.Update(line.Quantity, line.UnitPrice, discountPct);
+
+        // Recalculate order-level totals from the updated lines.
+        order.RecalcTotalsFromLines(lines);
+
+        await _db.SaveChangesAsync(ct);
+
+        return (await GetSalesOrderAsync(orderId, ct))!;
     }
 
     public async Task ConfirmSalesOrderAsync(Guid id, CancellationToken ct = default)

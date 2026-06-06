@@ -20,7 +20,14 @@ public class Product : BaseEntity
     public string UnitOfMeasure { get; private set; } = "Each";
     public decimal BasePrice { get; private set; }
     public decimal BaseCost { get; private set; }
-    public decimal TaxRate { get; private set; }
+
+    /// <summary>
+    /// Per-product tax rate override. Null means "use the category's TaxRate".
+    /// Only set this for exceptional products that differ from their category
+    /// (e.g. a food product in the Clothing category, or a tax-exempt gift card).
+    /// </summary>
+    public decimal? TaxRateOverride { get; private set; }
+
     public string Currency { get; private set; } = "USD";
     public string? Tags { get; private set; }           // comma-separated
     public string? ImageUrl { get; private set; }       // primary image
@@ -40,46 +47,55 @@ public class Product : BaseEntity
     private Product() { }
 
     public Product(Guid organizationId, string sku, string name, Guid categoryId,
-        ProductType productType, decimal basePrice, decimal baseCost, decimal taxRate,
+        ProductType productType, decimal basePrice, decimal baseCost,
         string unitOfMeasure = "Each", Guid? brandId = null,
         GenderTarget genderTarget = GenderTarget.Unisex,
-        string? description = null, string? tags = null, string currency = "USD")
+        string? description = null, string? tags = null, string currency = "USD",
+        decimal? taxRateOverride = null)
     {
-        OrganizationId = organizationId;
-        Sku = sku.Trim().ToUpperInvariant();
-        Name = name.Trim();
-        CategoryId = categoryId;
-        ProductType = productType;
-        BasePrice = basePrice;
-        BaseCost = baseCost;
-        TaxRate = taxRate;
-        UnitOfMeasure = unitOfMeasure;
-        BrandId = brandId;
-        GenderTarget = genderTarget;
-        Description = description;
-        Tags = tags;
-        Currency = currency;
+        OrganizationId  = organizationId;
+        Sku             = sku.Trim().ToUpperInvariant();
+        Name            = name.Trim();
+        CategoryId      = categoryId;
+        ProductType     = productType;
+        BasePrice       = basePrice;
+        BaseCost        = baseCost;
+        TaxRateOverride = taxRateOverride;
+        UnitOfMeasure   = unitOfMeasure;
+        BrandId         = brandId;
+        GenderTarget    = genderTarget;
+        Description     = description;
+        Tags            = tags;
+        Currency        = currency;
     }
 
     public void Update(string name, string? description, string? longDescription,
         Guid categoryId, Guid? brandId, decimal basePrice, decimal baseCost,
-        decimal taxRate, ProductType productType, GenderTarget genderTarget,
-        string? tags, string? imageUrl)
+        ProductType productType, GenderTarget genderTarget,
+        string? tags, string? imageUrl, decimal? taxRateOverride = null)
     {
-        Name = name.Trim();
-        Description = description;
+        Name            = name.Trim();
+        Description     = description;
         LongDescription = longDescription;
-        CategoryId = categoryId;
-        BrandId = brandId;
-        BasePrice = basePrice;
-        BaseCost = baseCost;
-        TaxRate = taxRate;
-        ProductType = productType;
-        GenderTarget = genderTarget;
-        Tags = tags;
-        ImageUrl = imageUrl;
+        CategoryId      = categoryId;
+        BrandId         = brandId;
+        BasePrice       = basePrice;
+        BaseCost        = baseCost;
+        TaxRateOverride = taxRateOverride;
+        ProductType     = productType;
+        GenderTarget    = genderTarget;
+        Tags            = tags;
+        ImageUrl        = imageUrl;
         SetUpdated();
     }
+
+    /// <summary>
+    /// Returns the effective tax rate: product-level override if set,
+    /// otherwise falls back to the category's default tax rate.
+    /// Always load the Category navigation property before calling this.
+    /// </summary>
+    public decimal EffectiveTaxRate(decimal categoryTaxRate) =>
+        TaxRateOverride ?? categoryTaxRate;
 
     public ProductVariant AddVariant(string size, string? color, string? material,
         string? barcode = null, decimal? priceOverride = null, decimal? costOverride = null)

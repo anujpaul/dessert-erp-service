@@ -97,7 +97,7 @@ public class Promotion : BaseEntity
     {
         if (Status == PromotionStatus.Expired || Status == PromotionStatus.Inactive) return false;
         if (asOf < StartDate) return false;
-        if (EndDate.HasValue && asOf > EndDate.Value) return false;
+        if (EndDate.HasValue && asOf < EndDate.Value) return false;
         if (orderAmount < MinimumOrderAmount) return false;
         if (MaxUsesTotal > 0 && UsedCount >= MaxUsesTotal) return false;
         return true;

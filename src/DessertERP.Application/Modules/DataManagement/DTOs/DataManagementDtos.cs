@@ -144,6 +144,7 @@ public static class ProductFields
 public static class SalesOrderFields
 {
     // Order-level
+    public const string OrderNumber       = "OrderNumber";
     public const string CustomerNumber    = "CustomerNumber";
     public const string OrderDate         = "OrderDate";
     public const string RequestedShipDate = "RequestedShipDate";
@@ -164,7 +165,7 @@ public static class SalesOrderFields
 
     public static readonly string[] All =
     [
-        CustomerNumber, OrderDate, RequestedShipDate, Description,
+        OrderNumber, CustomerNumber, OrderDate, RequestedShipDate, Description,
         CustomerRef, Currency, SalesRep, ShippingAddress, Notes, Priority,
         VariantSku, Quantity, UnitPrice, DiscountPct, TaxRate, LineNotes
     ];

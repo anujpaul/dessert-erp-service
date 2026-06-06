@@ -174,22 +174,89 @@ public static class DatabaseSeeder
             return brand;
         }
 
-        // ── Categories ──────────────────────────────────────────────────────
-        var catClothing   = await GetOrCreateCategory("CLO",    "Clothing",              null,          null, 1);
-        var catFootwear   = await GetOrCreateCategory("FOOT",   "Footwear",              null,          null, 2);
-        var catAccessory  = await GetOrCreateCategory("ACC",    "Accessories",           null,          null, 3);
-        var catFood       = await GetOrCreateCategory("FOOD",   "Food & Treats",         null,          null, 4);
-        var catCare       = await GetOrCreateCategory("CARE",   "Personal Care",         null,          null, 5);
+        // ── Categories — Full Retail Hierarchy (GS1-inspired, A–L top-level) ─
+        var catClothing   = await GetOrCreateCategory("A",    "Clothing & Apparel",     null,           null, 1);
+        var catFootwear   = await GetOrCreateCategory("B",    "Footwear",               null,           null, 2);
+        var catUnderwearT = await GetOrCreateCategory("C",    "Underwear & Intimates",  null,           null, 3);
+        var catSports     = await GetOrCreateCategory("D",    "Sports & Outdoors",      null,           null, 4);
+        var catToys       = await GetOrCreateCategory("E",    "Toys & Games",           null,           null, 5);
+        var catAccessory  = await GetOrCreateCategory("F",    "Accessories & Bags",     null,           null, 6);
+        var catFood       = await GetOrCreateCategory("G",    "Food & Beverage",        null,           null, 7);
+        var catBeauty     = await GetOrCreateCategory("H",    "Beauty & Personal Care", null,           null, 8);
+        var catHome       = await GetOrCreateCategory("I",    "Home & Living",          null,           null, 9);
+        var catElectronics= await GetOrCreateCategory("J",    "Electronics",            null,           null, 10);
+        var catHealth     = await GetOrCreateCategory("K",    "Health & Wellness",      null,           null, 11);
+        var catPets       = await GetOrCreateCategory("L",    "Pet Supplies",           null,           null, 12);
 
-        var catMensClothing   = await GetOrCreateCategory("CLO-M",  "Men's Clothing",         catClothing.Id,  null, 1);
-        var catWomensClothing = await GetOrCreateCategory("CLO-W",  "Women's Clothing",       catClothing.Id,  null, 2);
-        var catUnderwear      = await GetOrCreateCategory("CLO-U",  "Underwear & Base Layer", catClothing.Id,  null, 3);
-        var catMensFootwear   = await GetOrCreateCategory("FOOT-M", "Men's Footwear",         catFootwear.Id,  null, 1);
-        var catWomensFootwear = await GetOrCreateCategory("FOOT-W", "Women's Footwear",       catFootwear.Id,  null, 2);
-        var catWallets        = await GetOrCreateCategory("ACC-W",  "Wallets & Bags",         catAccessory.Id, null, 1);
-        var catSocks          = await GetOrCreateCategory("ACC-S",  "Socks",                  catAccessory.Id, null, 2);
-        var catCandy          = await GetOrCreateCategory("FOOD-C", "Candy & Chocolates",     catFood.Id,      null, 1);
-        var catCream          = await GetOrCreateCategory("CARE-C", "Creams & Lotions",       catCare.Id,      null, 1);
+        // A — Clothing subcategories
+        var catShirts     = await GetOrCreateCategory("A-01", "Shirts & Tops",          catClothing.Id, null, 1);
+        var catPants      = await GetOrCreateCategory("A-02", "Pants & Trousers",       catClothing.Id, null, 2);
+        var catShorts     = await GetOrCreateCategory("A-03", "Shorts",                 catClothing.Id, null, 3);
+        var catJackets    = await GetOrCreateCategory("A-04", "Jackets & Outerwear",    catClothing.Id, null, 4);
+        var catDresses    = await GetOrCreateCategory("A-05", "Dresses & Skirts",       catClothing.Id, null, 5);
+        var catSweaters   = await GetOrCreateCategory("A-06", "Sweaters & Hoodies",     catClothing.Id, null, 6);
+        var catSuits      = await GetOrCreateCategory("A-07", "Suits & Formal",         catClothing.Id, null, 7);
+        var catSleepwear  = await GetOrCreateCategory("A-08", "Sleepwear",              catClothing.Id, null, 8);
+        var catSwimwear   = await GetOrCreateCategory("A-09", "Swimwear",               catClothing.Id, null, 9);
+        var catWorkwear   = await GetOrCreateCategory("A-10", "Workwear & Uniforms",    catClothing.Id, null, 10);
+
+        // B — Footwear subcategories
+        var catSneakers   = await GetOrCreateCategory("B-01", "Sneakers & Athletic",    catFootwear.Id, null, 1);
+        var catBoots      = await GetOrCreateCategory("B-02", "Boots",                  catFootwear.Id, null, 2);
+        var catSandals    = await GetOrCreateCategory("B-03", "Sandals & Flip Flops",   catFootwear.Id, null, 3);
+        var catDressShoes = await GetOrCreateCategory("B-04", "Dress Shoes",            catFootwear.Id, null, 4);
+        var catSlippers   = await GetOrCreateCategory("B-05", "Slippers & Casual",      catFootwear.Id, null, 5);
+        var catHikingBoots= await GetOrCreateCategory("B-06", "Hiking & Trail",         catFootwear.Id, null, 6);
+
+        // C — Underwear subcategories
+        var catMensUnderwear   = await GetOrCreateCategory("C-01", "Men's Underwear",       catUnderwearT.Id, null, 1);
+        var catWomensUnderwear = await GetOrCreateCategory("C-02", "Women's Underwear",     catUnderwearT.Id, null, 2);
+        var catBras            = await GetOrCreateCategory("C-03", "Bras & Bralettes",      catUnderwearT.Id, null, 3);
+        var catSocks           = await GetOrCreateCategory("C-04", "Socks & Hosiery",       catUnderwearT.Id, null, 4);
+        var catBaseLayer       = await GetOrCreateCategory("C-05", "Base Layer & Thermals", catUnderwearT.Id, null, 5);
+
+        // D — Sports subcategories
+        var catGym        = await GetOrCreateCategory("D-01", "Gym & Fitness",          catSports.Id,   null, 1);
+        var catRunning    = await GetOrCreateCategory("D-02", "Running & Jogging",      catSports.Id,   null, 2);
+        var catHiking     = await GetOrCreateCategory("D-03", "Hiking & Camping",       catSports.Id,   null, 3);
+        var catTeamSports = await GetOrCreateCategory("D-04", "Team Sports",            catSports.Id,   null, 4);
+        var catYoga       = await GetOrCreateCategory("D-05", "Yoga & Pilates",         catSports.Id,   null, 5);
+
+        // E — Toys subcategories
+        var catToysInfant = await GetOrCreateCategory("E-01", "Infant & Toddler",       catToys.Id,     null, 1);
+        var catToysPuzzle = await GetOrCreateCategory("E-02", "Puzzles & Board Games",  catToys.Id,     null, 2);
+        var catToysAction = await GetOrCreateCategory("E-03", "Action Figures",         catToys.Id,     null, 3);
+        var catToysDolls  = await GetOrCreateCategory("E-04", "Dolls & Plush",          catToys.Id,     null, 4);
+        var catToysSTEM   = await GetOrCreateCategory("E-05", "STEM & Educational",     catToys.Id,     null, 5);
+
+        // F — Accessories subcategories
+        var catBags       = await GetOrCreateCategory("F-01", "Bags & Backpacks",       catAccessory.Id,null, 1);
+        var catWallets    = await GetOrCreateCategory("F-02", "Wallets & Cardholders",  catAccessory.Id,null, 2);
+        var catHats       = await GetOrCreateCategory("F-03", "Hats & Caps",            catAccessory.Id,null, 3);
+        var catBelts      = await GetOrCreateCategory("F-04", "Belts & Suspenders",     catAccessory.Id,null, 4);
+        var catSunglasses = await GetOrCreateCategory("F-05", "Sunglasses & Eyewear",   catAccessory.Id,null, 5);
+        var catJewelry    = await GetOrCreateCategory("F-06", "Jewelry & Watches",      catAccessory.Id,null, 6);
+
+        // G — Food subcategories
+        var catCandy      = await GetOrCreateCategory("G-01", "Candy & Chocolate",      catFood.Id,     null, 1);
+        var catSnacks     = await GetOrCreateCategory("G-02", "Snacks & Chips",         catFood.Id,     null, 2);
+        var catBeverages  = await GetOrCreateCategory("G-03", "Beverages",              catFood.Id,     null, 3);
+        var catBaked      = await GetOrCreateCategory("G-04", "Baked Goods",            catFood.Id,     null, 4);
+
+        // H — Beauty subcategories
+        var catCream      = await GetOrCreateCategory("H-01", "Creams & Moisturizers",  catBeauty.Id,   null, 1);
+        var catHairCare   = await GetOrCreateCategory("H-02", "Hair Care",              catBeauty.Id,   null, 2);
+        var catMakeup     = await GetOrCreateCategory("H-03", "Makeup & Cosmetics",     catBeauty.Id,   null, 3);
+        var catSkinCare   = await GetOrCreateCategory("H-04", "Skin Care",              catBeauty.Id,   null, 4);
+        var catOralCare   = await GetOrCreateCategory("H-05", "Oral Care",              catBeauty.Id,   null, 5);
+
+        // Backward-compat aliases for existing seeded products
+        var catMensClothing   = catShirts;
+        var catWomensClothing = catShirts;
+        var catUnderwear      = catMensUnderwear;
+        var catMensFootwear   = catHikingBoots;
+        var catWomensFootwear = catSneakers;
+        var catCare           = catBeauty;
 
         // ── Brands ──────────────────────────────────────────────────────────
         var brandDuluth      = await GetOrCreateBrand("DULUTH",  "Duluth Trading Co.",    "House brand — built for hard work",          "USA", "https://duluthtrading.com");
@@ -246,7 +313,7 @@ public static class DatabaseSeeder
 
         await AddProduct(
             new Product(orgId, "DTC-PANT-001", "Fire Hose Work Pants",
-                catMensClothing.Id, ProductType.Clothing, 84.50m, 32.00m, 7m,
+                catMensClothing.Id, ProductType.Clothing, 84.50m, 32.00m, 
                 "Each", brandDuluth.Id, GenderTarget.Men,
                 "Tough as iron, comfortable all day. Built from our exclusive Fire Hose canvas.",
                 "workwear,pants,tough"),
@@ -265,7 +332,7 @@ public static class DatabaseSeeder
 
         await AddProduct(
             new Product(orgId, "DTC-SHIRT-001", "Longtail T-Shirt",
-                catMensClothing.Id, ProductType.Clothing, 34.50m, 12.00m, 7m,
+                catMensClothing.Id, ProductType.Clothing, 34.50m, 12.00m, 
                 "Each", brandDuluth.Id, GenderTarget.Men,
                 "Extra-long tails stay tucked. Heavyweight cotton for durability.",
                 "t-shirt,longtail,cotton"),
@@ -286,7 +353,7 @@ public static class DatabaseSeeder
 
         await AddProduct(
             new Product(orgId, "DTC-FLANNEL-001", "Alaskan Hardgear Flannel Shirt",
-                catMensClothing.Id, ProductType.Clothing, 89.50m, 34.00m, 7m,
+                catMensClothing.Id, ProductType.Clothing, 89.50m, 34.00m, 
                 "Each", brandDuluth.Id, GenderTarget.Men,
                 "Heavyweight flannel for serious outdoor work. Double-woven for warmth.",
                 "flannel,shirt,heavyweight,outdoor"),
@@ -307,7 +374,7 @@ public static class DatabaseSeeder
 
         await AddProduct(
             new Product(orgId, "DTC-WPANT-001", "Women's Flex Fire Hose Work Pants",
-                catWomensClothing.Id, ProductType.Clothing, 79.50m, 30.00m, 7m,
+                catWomensClothing.Id, ProductType.Clothing, 79.50m, 30.00m, 
                 "Each", brandDuluth.Id, GenderTarget.Women,
                 "All the toughness of Fire Hose with a cut designed for women.",
                 "workwear,pants,women,flex"),
@@ -327,7 +394,7 @@ public static class DatabaseSeeder
 
         await AddProduct(
             new Product(orgId, "DTC-WSHIRT-001", "Women's Longtail T-Shirt",
-                catWomensClothing.Id, ProductType.Clothing, 32.50m, 11.00m, 7m,
+                catWomensClothing.Id, ProductType.Clothing, 32.50m, 11.00m, 
                 "Each", brandDuluth.Id, GenderTarget.Women,
                 "Longer length stays tucked, no matter how you move.",
                 "t-shirt,longtail,women"),
@@ -348,7 +415,7 @@ public static class DatabaseSeeder
 
         await AddProduct(
             new Product(orgId, "DTC-BUCK-M-001", "Buck Naked Performance Underwear — Men",
-                catUnderwear.Id, ProductType.Clothing, 24.50m, 8.50m, 7m,
+                catUnderwear.Id, ProductType.Clothing, 24.50m, 8.50m, 
                 "Each", brandDuluth.Id, GenderTarget.Men,
                 "No chafing, no bunching, no baloney. Our most popular underwear.",
                 "underwear,buck-naked,men,performance"),
@@ -369,7 +436,7 @@ public static class DatabaseSeeder
 
         await AddProduct(
             new Product(orgId, "DTC-BUCK-W-001", "Buck Naked Performance Underwear — Women",
-                catUnderwear.Id, ProductType.Clothing, 22.50m, 8.00m, 7m,
+                catUnderwear.Id, ProductType.Clothing, 22.50m, 8.00m, 
                 "Each", brandDuluth.Id, GenderTarget.Women,
                 "Silky-smooth, zero chafe. Designed specifically for women.",
                 "underwear,buck-naked,women,performance"),
@@ -390,7 +457,7 @@ public static class DatabaseSeeder
 
         await AddProduct(
             new Product(orgId, "DTC-BOOT-001", "Duluth XTRATUF Ankle Deck Boot — Men",
-                catMensFootwear.Id, ProductType.Footwear, 119.00m, 52.00m, 7m,
+                catMensFootwear.Id, ProductType.Footwear, 119.00m, 52.00m, 
                 "Pair", brandDuluth.Id, GenderTarget.Men,
                 "100% waterproof. Non-marking, slip-resistant sole. Built for wet conditions.",
                 "boots,waterproof,men,work"),
@@ -410,7 +477,7 @@ public static class DatabaseSeeder
 
         await AddProduct(
             new Product(orgId, "DTC-TRAIL-W-001", "Women's Dry on the Fly Trail Runner",
-                catWomensFootwear.Id, ProductType.Footwear, 99.00m, 42.00m, 7m,
+                catWomensFootwear.Id, ProductType.Footwear, 99.00m, 42.00m, 
                 "Pair", brandDuluth.Id, GenderTarget.Women,
                 "Lightweight, breathable trail runner with moisture-wicking tech.",
                 "trail,running,women,breathable"),
@@ -431,7 +498,7 @@ public static class DatabaseSeeder
 
         await AddProduct(
             new Product(orgId, "DT-SOCK-HIKE-001", "Darn Tough Vermont Hiker Micro Crew",
-                catSocks.Id, ProductType.Accessory, 26.00m, 10.00m, 7m,
+                catSocks.Id, ProductType.Accessory, 26.00m, 10.00m, 
                 "Pair", brandDarnTough.Id, GenderTarget.Unisex,
                 "Merino wool, guaranteed for life. The last hiking sock you'll ever buy.",
                 "socks,merino,hiking,lifetime-guarantee"),
@@ -449,7 +516,7 @@ public static class DatabaseSeeder
 
         await AddProduct(
             new Product(orgId, "F2F-SOCK-RUN-001", "Farm to Feet Burlington Running Sock",
-                catSocks.Id, ProductType.Accessory, 20.00m, 7.50m, 7m,
+                catSocks.Id, ProductType.Accessory, 20.00m, 7.50m, 
                 "Pair", brandFarmFeet.Id, GenderTarget.Unisex,
                 "American-made merino wool. Cushioned, moisture-wicking running sock.",
                 "socks,merino,running,american-made"),
@@ -467,7 +534,7 @@ public static class DatabaseSeeder
 
         await AddProduct(
             new Product(orgId, "DTC-WALL-001", "Duluth RFID-Blocking Leather Bifold Wallet",
-                catWallets.Id, ProductType.Accessory, 49.50m, 18.00m, 7m,
+                catWallets.Id, ProductType.Accessory, 49.50m, 18.00m, 
                 "Each", brandDuluth.Id, GenderTarget.Unisex,
                 "Full-grain leather. RFID-blocking tech protects your cards. Made to last.",
                 "wallet,leather,rfid,bifold"),
@@ -481,7 +548,7 @@ public static class DatabaseSeeder
 
         await AddProduct(
             new Product(orgId, "DTC-WALL-002", "Duluth Slim Card Holder Wallet",
-                catWallets.Id, ProductType.Accessory, 34.50m, 12.00m, 7m,
+                catWallets.Id, ProductType.Accessory, 34.50m, 12.00m, 
                 "Each", brandDuluth.Id, GenderTarget.Unisex,
                 "Holds up to 8 cards. Minimalist design with rugged leather construction.",
                 "wallet,slim,minimalist,leather"),
@@ -496,7 +563,7 @@ public static class DatabaseSeeder
 
         await AddProduct(
             new Product(orgId, "GHI-CHOC-001", "Ghirardelli Dark Chocolate Square — 72%",
-                catCandy.Id, ProductType.Food, 4.99m, 1.80m, 8m,
+                catCandy.Id, ProductType.Food, 4.99m, 1.80m, 
                 "Each", brandGhirardelli.Id, GenderTarget.None,
                 "Individually wrapped dark chocolate. Rich, intense flavor. 72% cacao.",
                 "chocolate,dark,72-percent,ghirardelli"),
@@ -510,7 +577,7 @@ public static class DatabaseSeeder
 
         await AddProduct(
             new Product(orgId, "GHI-CHOC-002", "Ghirardelli Milk Chocolate Caramel Square",
-                catCandy.Id, ProductType.Food, 4.99m, 1.80m, 8m,
+                catCandy.Id, ProductType.Food, 4.99m, 1.80m, 
                 "Each", brandGhirardelli.Id, GenderTarget.None,
                 "Creamy milk chocolate wrapped around soft caramel filling.",
                 "chocolate,milk,caramel,ghirardelli"),
@@ -524,7 +591,7 @@ public static class DatabaseSeeder
 
         await AddProduct(
             new Product(orgId, "DTC-CANDY-001", "Duluth Trail Mix Chocolate Bark",
-                catCandy.Id, ProductType.Food, 12.99m, 4.50m, 8m,
+                catCandy.Id, ProductType.Food, 12.99m, 4.50m, 
                 "Each", brandDuluth.Id, GenderTarget.None,
                 "Dark chocolate bark loaded with nuts, seeds, and dried fruit. Trail-ready energy.",
                 "candy,chocolate,trail-mix,bark"),
@@ -540,7 +607,7 @@ public static class DatabaseSeeder
 
         await AddProduct(
             new Product(orgId, "DTC-CREAM-001", "Duluth Trading Lumber Liquidator Hand Cream",
-                catCream.Id, ProductType.PersonalCare, 14.99m, 5.50m, 7m,
+                catCream.Id, ProductType.PersonalCare, 14.99m, 5.50m, 
                 "Each", brandDuluth.Id, GenderTarget.Unisex,
                 "Heavy-duty hand cream. Works fast for cracked, rough hands. Unscented.",
                 "cream,hand,heavy-duty,unscented"),
@@ -554,7 +621,7 @@ public static class DatabaseSeeder
 
         await AddProduct(
             new Product(orgId, "DTC-CREAM-002", "Duluth Aloe Vera After-Sun Lotion",
-                catCream.Id, ProductType.PersonalCare, 11.99m, 4.00m, 7m,
+                catCream.Id, ProductType.PersonalCare, 11.99m, 4.00m, 
                 "Each", brandDuluth.Id, GenderTarget.Unisex,
                 "Soothing aloe vera lotion for sun-exposed skin. Lightweight, fast absorbing.",
                 "lotion,aloe-vera,after-sun,soothing"),

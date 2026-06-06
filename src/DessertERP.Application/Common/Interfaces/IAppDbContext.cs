@@ -4,6 +4,7 @@ using DessertERP.Domain.Modules.DataManagement;
 using DessertERP.Domain.Modules.GeneralLedger;
 using DessertERP.Domain.Modules.Organization;
 using DessertERP.Domain.Modules.ProductManagement;
+using DessertERP.Domain.Modules.Marketing;
 using DessertERP.Domain.Modules.Retail;
 using DessertERP.Domain.Modules.SystemAdmin;
 using Microsoft.EntityFrameworkCore;
@@ -65,6 +66,14 @@ public interface IAppDbContext
     DbSet<Promotion>          Promotions          { get; }
     DbSet<Coupon>             Coupons             { get; }
     DbSet<CouponRedemption>   CouponRedemptions   { get; }
+
+    // Marketing
+    DbSet<Campaign>                Campaigns              { get; }
+    DbSet<LoyaltyProgram>          LoyaltyPrograms        { get; }
+    DbSet<CustomerLoyaltyAccount>  CustomerLoyaltyAccounts { get; }
+
+    // Trade / Price Agreements
+    DbSet<PriceAgreement> PriceAgreements { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

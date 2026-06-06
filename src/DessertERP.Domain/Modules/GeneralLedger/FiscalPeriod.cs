@@ -41,4 +41,19 @@ public class FiscalPeriod : BaseEntity
         Status = FiscalPeriodStatus.Open;
         SetUpdated();
     }
+
+    public void Update(string name, DateTime startDate, DateTime endDate)
+    {
+        Name = name;
+        StartDate = startDate;
+        EndDate = endDate;
+        SetUpdated();
+    }
+
+    /// <summary>Internal — called by FiscalYear when re-numbering after a delete.</summary>
+    internal void SetPeriodNumber(int num)
+    {
+        PeriodNumber = num;
+        SetUpdated();
+    }
 }

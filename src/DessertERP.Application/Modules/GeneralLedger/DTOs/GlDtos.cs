@@ -11,7 +11,17 @@ public record FiscalPeriodDto(Guid Id, Guid FiscalYearId, int PeriodNumber,
 public record CreateFiscalYearRequest(
     string Name, string Description,
     DateTime StartDate, DateTime EndDate,
-    string CalendarType = "Monthly", bool AutoGeneratePeriods = true);
+    string CalendarType = "Monthly");
+
+/// <summary>Manually add a single custom period.</summary>
+public record CreatePeriodRequest(string Name, DateTime StartDate, DateTime EndDate);
+
+/// <summary>Bulk-generate periods using a preset calendar pattern.</summary>
+/// <param name="Type">Monthly | Quarterly | 4-4-5</param>
+public record GeneratePeriodsRequest(string Type);
+
+/// <summary>Rename / re-date an existing Open period.</summary>
+public record UpdatePeriodRequest(string Name, DateTime StartDate, DateTime EndDate);
 
 // ── Chart of Accounts ─────────────────────────────────────────────────────────
 public record AccountTypeDto(Guid Id, string Code, string Name, string Nature, int DisplayOrder);

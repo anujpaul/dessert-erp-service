@@ -38,9 +38,37 @@ public class GeneralLedgerController : ControllerBase
         catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
     }
 
-    [HttpGet("fiscal-years/{id:guid}/periods")]
-    public async Task<IActionResult> GetPeriods(Guid id, CancellationToken ct)
-        => Ok(await _svc.GetPeriodsAsync(id, ct));
+    [HttpGet("fiscal-years/{fyId:guid}/periods")]
+    public async Task<IActionResult> GetPeriods(Guid fyId, CancellationToken ct)
+        => Ok(await _svc.GetPeriodsAsync(fyId, ct));
+
+    [HttpPost("fiscal-years/{fyId:guid}/periods")]
+    public async Task<IActionResult> CreatePeriod(Guid fyId, [FromBody] CreatePeriodRequest req, CancellationToken ct)
+    {
+        try { return StatusCode(201, await _svc.CreatePeriodAsync(fyId, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("fiscal-years/{fyId:guid}/periods/generate")]
+    public async Task<IActionResult> GeneratePeriods(Guid fyId, [FromBody] GeneratePeriodsRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.GeneratePeriodsAsync(fyId, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPut("fiscal-years/{fyId:guid}/periods/{periodId:guid}")]
+    public async Task<IActionResult> UpdatePeriod(Guid fyId, Guid periodId, [FromBody] UpdatePeriodRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.UpdatePeriodAsync(fyId, periodId, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpDelete("fiscal-years/{fyId:guid}/periods/{periodId:guid}")]
+    public async Task<IActionResult> DeletePeriod(Guid fyId, Guid periodId, CancellationToken ct)
+    {
+        try { await _svc.DeletePeriodAsync(fyId, periodId, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
 
     [HttpPost("periods/{id:guid}/close")]
     public async Task<IActionResult> ClosePeriod(Guid id, CancellationToken ct)

@@ -13,6 +13,10 @@ public interface IGeneralLedgerService
     Task<FiscalYearDto> CreateFiscalYearAsync(CreateFiscalYearRequest req, CancellationToken ct = default);
     Task CloseFiscalYearAsync(Guid id, CancellationToken ct = default);
     Task<IEnumerable<FiscalPeriodDto>> GetPeriodsAsync(Guid fiscalYearId, CancellationToken ct = default);
+    Task<FiscalPeriodDto> CreatePeriodAsync(Guid fiscalYearId, CreatePeriodRequest req, CancellationToken ct = default);
+    Task<IEnumerable<FiscalPeriodDto>> GeneratePeriodsAsync(Guid fiscalYearId, GeneratePeriodsRequest req, CancellationToken ct = default);
+    Task<FiscalPeriodDto> UpdatePeriodAsync(Guid fiscalYearId, Guid periodId, UpdatePeriodRequest req, CancellationToken ct = default);
+    Task DeletePeriodAsync(Guid fiscalYearId, Guid periodId, CancellationToken ct = default);
     Task ClosePeriodAsync(Guid periodId, CancellationToken ct = default);
     Task<FiscalPeriodDto?> GetCurrentPeriodAsync(CancellationToken ct = default);
 
@@ -62,10 +66,84 @@ public class GeneralLedgerService : IGeneralLedgerService
     public async Task<FiscalYearDto> CreateFiscalYearAsync(CreateFiscalYearRequest req, CancellationToken ct = default)
     {
         var fy = new FiscalYear(_org.OrganizationId, req.Name, req.Description, req.StartDate, req.EndDate, req.CalendarType);
-        if (req.AutoGeneratePeriods) fy.GenerateMonthlyPeriods();
+        // No auto-generation — user defines periods explicitly after creation
         _db.FiscalYears.Add(fy);
         await _db.SaveChangesAsync(ct);
         return ToFiscalYearDto(fy);
+    }
+
+    public async Task<FiscalPeriodDto> CreatePeriodAsync(Guid fiscalYearId, CreatePeriodRequest req, CancellationToken ct = default)
+    {
+        var fy = await _db.FiscalYears
+            .Include(y => y.Periods)
+            .FirstOrDefaultAsync(y => y.Id == fiscalYearId && !y.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Fiscal year not found.");
+        var period = fy.AddPeriod(req.Name, req.StartDate, req.EndDate);
+        await _db.SaveChangesAsync(ct);
+        return ToPeriodDto(period);
+    }
+
+    public async Task<IEnumerable<FiscalPeriodDto>> GeneratePeriodsAsync(Guid fiscalYearId, GeneratePeriodsRequest req, CancellationToken ct = default)
+    {
+        var fy = await _db.FiscalYears
+            .Include(y => y.Periods)
+            .FirstOrDefaultAsync(y => y.Id == fiscalYearId && !y.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Fiscal year not found.");
+
+        // 1. Wipe existing periods from DB
+        var existing = await _db.FiscalPeriods.Where(p => p.FiscalYearId == fiscalYearId).ToListAsync(ct);
+        _db.FiscalPeriods.RemoveRange(existing);
+        await _db.SaveChangesAsync(ct);
+
+        // 2. Build period list using domain helpers (these operate on an in-memory FY)
+        var template = new FiscalYear(_org.OrganizationId, fy.Name, fy.Description, fy.StartDate, fy.EndDate, fy.CalendarType);
+        switch (req.Type.ToUpperInvariant())
+        {
+            case "MONTHLY":   template.GenerateMonthlyPeriods();   break;
+            case "QUARTERLY": template.GenerateQuarterlyPeriods(); break;
+            case "4-4-5":     template.Generate445Periods();       break;
+            default: throw new InvalidOperationException(
+                $"Unknown period type '{req.Type}'. Valid values: Monthly, Quarterly, 4-4-5.");
+        }
+
+        // 3. Persist generated periods with the real FiscalYearId
+        var saved = new List<FiscalPeriod>();
+        foreach (var p in template.Periods.OrderBy(x => x.PeriodNumber))
+        {
+            var period = new FiscalPeriod(fiscalYearId, p.PeriodNumber, p.Name, p.StartDate, p.EndDate);
+            _db.FiscalPeriods.Add(period);
+            saved.Add(period);
+        }
+        await _db.SaveChangesAsync(ct);
+
+        return saved.Select(ToPeriodDto);
+    }
+
+    public async Task<FiscalPeriodDto> UpdatePeriodAsync(Guid fiscalYearId, Guid periodId, UpdatePeriodRequest req, CancellationToken ct = default)
+    {
+        var period = await _db.FiscalPeriods
+            .FirstOrDefaultAsync(p => p.Id == periodId && p.FiscalYearId == fiscalYearId && !p.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Period not found.");
+        if (period.Status != FiscalPeriodStatus.Open)
+            throw new InvalidOperationException("Only Open periods can be edited.");
+        period.Update(req.Name, req.StartDate, req.EndDate);
+        await _db.SaveChangesAsync(ct);
+        return ToPeriodDto(period);
+    }
+
+    public async Task DeletePeriodAsync(Guid fiscalYearId, Guid periodId, CancellationToken ct = default)
+    {
+        var hasEntries = await _db.JournalEntries.AnyAsync(j => j.FiscalPeriodId == periodId && !j.IsDeleted, ct);
+        if (hasEntries) throw new InvalidOperationException("Cannot delete a period that has journal entries posted to it.");
+
+        var period = await _db.FiscalPeriods
+            .FirstOrDefaultAsync(p => p.Id == periodId && p.FiscalYearId == fiscalYearId && !p.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Period not found.");
+        if (period.Status != FiscalPeriodStatus.Open)
+            throw new InvalidOperationException("Only Open periods can be deleted.");
+
+        _db.FiscalPeriods.Remove(period);
+        await _db.SaveChangesAsync(ct);
     }
 
     public async Task CloseFiscalYearAsync(Guid id, CancellationToken ct = default)

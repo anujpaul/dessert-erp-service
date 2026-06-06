@@ -39,11 +39,13 @@ public interface IAppDbContext
     DbSet<ARPayment>      ARPayments      { get; }
 
     // Accounts Payable
-    DbSet<Vendor>           Vendors           { get; }
-    DbSet<PurchaseOrder>    PurchaseOrders    { get; }
-    DbSet<PurchaseOrderLine> PurchaseOrderLines { get; }
-    DbSet<APInvoice>        APInvoices        { get; }
-    DbSet<APPayment>        APPayments        { get; }
+    DbSet<Vendor>                   Vendors                    { get; }
+    DbSet<PurchaseOrder>            PurchaseOrders             { get; }
+    DbSet<PurchaseOrderLine>        PurchaseOrderLines         { get; }
+    DbSet<PurchaseOrderReceipt>     PurchaseOrderReceipts      { get; }
+    DbSet<PurchaseOrderReceiptLine> PurchaseOrderReceiptLines  { get; }
+    DbSet<APInvoice>                APInvoices                 { get; }
+    DbSet<APPayment>                APPayments                 { get; }
 
     // System Admin
     DbSet<AppUser>       AppUsers   { get; }

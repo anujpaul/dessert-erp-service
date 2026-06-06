@@ -80,10 +80,23 @@ public class AccountsPayableController : ControllerBase
         catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
     }
 
-    [HttpPost("purchase-orders/{id:guid}/receive")]
-    public async Task<IActionResult> ReceiveGoods(Guid id, [FromBody] IEnumerable<ReceiveGoodsRequest> req, CancellationToken ct)
+    /// <summary>Record a goods receipt (partial or full). Can be called multiple times on the same PO.</summary>
+    [HttpPost("purchase-orders/{id:guid}/receipts")]
+    public async Task<IActionResult> RecordReceipt(Guid id, [FromBody] RecordReceiptRequest req, CancellationToken ct)
     {
-        try { await _svc.ReceiveGoodsAsync(id, req, ct); return NoContent(); }
+        try { return StatusCode(201, await _svc.RecordReceiptAsync(id, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    /// <summary>List all goods-receipt events for a PO.</summary>
+    [HttpGet("purchase-orders/{id:guid}/receipts")]
+    public async Task<IActionResult> GetReceipts(Guid id, CancellationToken ct)
+        => Ok(await _svc.GetReceiptsAsync(id, ct));
+
+    [HttpPost("purchase-orders/{id:guid}/close")]
+    public async Task<IActionResult> Close(Guid id, CancellationToken ct)
+    {
+        try { await _svc.ClosePurchaseOrderAsync(id, ct); return NoContent(); }
         catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
     }
 

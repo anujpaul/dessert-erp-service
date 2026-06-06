@@ -19,16 +19,19 @@ public record UpdateVendorRequest(
 public record PurchaseOrderLineDto(
     Guid Id, Guid ProductVariantId, string ProductCode, string Description,
     string UnitOfMeasure, decimal OrderedQty, decimal ReceivedQty,
-    decimal UnitCost, decimal TaxRate, decimal LineTotal, bool IsFullyReceived);
+    decimal UnitCost, decimal TaxRate, decimal LineTotal,
+    bool IsFullyReceived, decimal OutstandingQty);
 
 public record PurchaseOrderSummaryDto(Guid Id, string PONumber, Guid VendorId,
     string VendorName, DateTime OrderDate, DateTime? ExpectedDate,
-    string Status, decimal GrandTotal, int LineCount, DateTime CreatedAt);
+    string Status, string InvoiceStatus, decimal GrandTotal, decimal InvoicedAmount,
+    int LineCount, DateTime CreatedAt);
 
 public record PurchaseOrderDto(Guid Id, string PONumber, Guid VendorId, string VendorName,
     DateTime OrderDate, DateTime? ExpectedDate, string Description, string Currency,
-    string Status, decimal SubTotal, decimal TaxTotal, decimal GrandTotal,
-    Guid? APInvoiceId, DateTime CreatedAt, IReadOnlyList<PurchaseOrderLineDto> Lines);
+    string Status, string InvoiceStatus, decimal SubTotal, decimal TaxTotal, decimal GrandTotal,
+    decimal InvoicedAmount, bool CanReceive, DateTime CreatedAt,
+    IReadOnlyList<PurchaseOrderLineDto> Lines);
 
 public record CreatePurchaseOrderRequest(
     Guid VendorId, DateTime OrderDate, string Description,
@@ -44,7 +47,20 @@ public record AddPOLineRequest(
     decimal UnitCost,
     decimal TaxRate = 0);
 
-public record ReceiveGoodsRequest(Guid LineId, decimal ReceivedQty);
+/// <summary>One line in a receive-goods request — identifies the PO line and qty being received.</summary>
+public record ReceiveLineRequest(Guid LineId, decimal Qty);
+
+/// <summary>Request to record a goods receipt against a PO (may be partial).</summary>
+public record RecordReceiptRequest(
+    IReadOnlyList<ReceiveLineRequest> Lines,
+    DateTime? ReceivedDate = null,
+    string? Notes = null);
+
+// ── Receipts ──────────────────────────────────────────────────────────────────
+public record ReceiptLineDto(Guid Id, Guid PurchaseOrderLineId, string ProductCode, string Description, decimal Qty);
+
+public record ReceiptDto(Guid Id, string ReceiptNumber, DateTime ReceivedDate,
+    string? Notes, DateTime CreatedAt, IReadOnlyList<ReceiptLineDto> Lines);
 
 // ── AP Invoice ────────────────────────────────────────────────────────────────
 public record APInvoiceDto(Guid Id, string InvoiceNumber, Guid VendorId,

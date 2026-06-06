@@ -37,14 +37,49 @@ public class PurchaseOrderConfiguration : IEntityTypeConfiguration<PurchaseOrder
         b.Property(e => e.Description).HasMaxLength(500);
         b.Property(e => e.Currency).HasMaxLength(3);
         b.Property(e => e.Status).HasConversion<string>().HasMaxLength(30);
+        b.Property(e => e.InvoiceStatus).HasConversion<string>().HasMaxLength(30);
         b.Property(e => e.SubTotal).HasColumnType("numeric(18,4)");
         b.Property(e => e.TaxTotal).HasColumnType("numeric(18,4)");
         b.Property(e => e.GrandTotal).HasColumnType("numeric(18,4)");
+        b.Property(e => e.InvoicedAmount).HasColumnType("numeric(18,4)");
+        b.Ignore(e => e.CanReceive);
         b.HasOne(e => e.Vendor).WithMany().HasForeignKey(e => e.VendorId);
         b.HasMany(e => e.Lines).WithOne(l => l.PurchaseOrder)
             .HasForeignKey(l => l.PurchaseOrderId).OnDelete(DeleteBehavior.Cascade);
+        b.HasMany(e => e.Receipts).WithOne(r => r.PurchaseOrder)
+            .HasForeignKey(r => r.PurchaseOrderId).OnDelete(DeleteBehavior.Cascade);
         b.HasIndex(e => new { e.OrganizationId, e.PONumber }).IsUnique();
         // Query filter applied in AppDbContext.OnModelCreating
+    }
+}
+
+public class PurchaseOrderReceiptConfiguration : IEntityTypeConfiguration<PurchaseOrderReceipt>
+{
+    public void Configure(EntityTypeBuilder<PurchaseOrderReceipt> b)
+    {
+        b.ToTable("purchase_order_receipts");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.OrganizationId).IsRequired();
+        b.Property(e => e.PurchaseOrderId).IsRequired();
+        b.Property(e => e.ReceiptNumber).HasMaxLength(30).IsRequired();
+        b.Property(e => e.Notes).HasMaxLength(500);
+        b.HasMany(e => e.Lines).WithOne(l => l.Receipt)
+            .HasForeignKey(l => l.ReceiptId).OnDelete(DeleteBehavior.Cascade);
+        b.HasIndex(e => e.ReceiptNumber).IsUnique();
+        b.HasQueryFilter(e => !e.IsDeleted);
+    }
+}
+
+public class PurchaseOrderReceiptLineConfiguration : IEntityTypeConfiguration<PurchaseOrderReceiptLine>
+{
+    public void Configure(EntityTypeBuilder<PurchaseOrderReceiptLine> b)
+    {
+        b.ToTable("purchase_order_receipt_lines");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.Qty).HasColumnType("numeric(18,4)");
+        b.HasOne(e => e.PurchaseOrderLine).WithMany()
+            .HasForeignKey(e => e.PurchaseOrderLineId).OnDelete(DeleteBehavior.Restrict);
+        b.HasQueryFilter(e => !e.IsDeleted);
     }
 }
 

@@ -21,7 +21,9 @@ public interface IAccountsPayableService
     Task<PurchaseOrderDto> AddPOLineAsync(Guid poId, AddPOLineRequest req, CancellationToken ct = default);
     Task RemovePOLineAsync(Guid poId, Guid lineId, CancellationToken ct = default);
     Task SendPurchaseOrderAsync(Guid id, CancellationToken ct = default);
-    Task ReceiveGoodsAsync(Guid poId, IEnumerable<ReceiveGoodsRequest> receipts, CancellationToken ct = default);
+    Task<ReceiptDto> RecordReceiptAsync(Guid poId, RecordReceiptRequest req, CancellationToken ct = default);
+    Task<IEnumerable<ReceiptDto>> GetReceiptsAsync(Guid poId, CancellationToken ct = default);
+    Task ClosePurchaseOrderAsync(Guid id, CancellationToken ct = default);
     Task CancelPurchaseOrderAsync(Guid id, CancellationToken ct = default);
 
     // AP Invoices
@@ -109,8 +111,8 @@ public class AccountsPayableService : IAccountsPayableService
         var list = await query.OrderByDescending(o => o.OrderDate).ToListAsync(ct);
         return list.Select(o => new PurchaseOrderSummaryDto(
             o.Id, o.PONumber, o.VendorId, o.Vendor?.Name ?? string.Empty,
-            o.OrderDate, o.ExpectedDate, o.Status.ToString(),
-            o.GrandTotal, o.Lines.Count, o.CreatedAt));
+            o.OrderDate, o.ExpectedDate, o.Status.ToString(), o.InvoiceStatus.ToString(),
+            o.GrandTotal, o.InvoicedAmount, o.Lines.Count, o.CreatedAt));
     }
 
     public async Task<PurchaseOrderDto?> GetPurchaseOrderAsync(Guid id, CancellationToken ct = default)
@@ -183,16 +185,55 @@ public class AccountsPayableService : IAccountsPayableService
         await _db.SaveChangesAsync(ct);
     }
 
-    public async Task ReceiveGoodsAsync(Guid poId, IEnumerable<ReceiveGoodsRequest> receipts, CancellationToken ct = default)
+    public async Task<ReceiptDto> RecordReceiptAsync(Guid poId, RecordReceiptRequest req, CancellationToken ct = default)
     {
         var po = await LoadPOWithLines(poId, ct);
-        foreach (var r in receipts)
+
+        if (!po.CanReceive)
+            throw new InvalidOperationException("This PO cannot receive more goods — it is either fully received, closed, or cancelled.");
+
+        var count = await _db.PurchaseOrderReceipts.CountAsync(ct) + 1;
+        var receiptDate = req.ReceivedDate?.Date ?? DateTime.UtcNow.Date;
+        var receipt = new PurchaseOrderReceipt(
+            po.OrganizationId, po.Id,
+            $"GRN-{count:D6}", receiptDate, req.Notes);
+
+        foreach (var lineReq in req.Lines)
         {
-            var line = po.Lines.FirstOrDefault(l => l.Id == r.LineId)
-                ?? throw new InvalidOperationException($"Line {r.LineId} not found.");
-            line.Receive(r.ReceivedQty);
+            if (lineReq.Qty <= 0) continue;
+            var poLine = po.Lines.FirstOrDefault(l => l.Id == lineReq.LineId)
+                ?? throw new InvalidOperationException($"PO line {lineReq.LineId} not found.");
+            poLine.Receive(lineReq.Qty);          // validates qty + updates ReceivedQty
+            receipt.AddLine(poLine.Id, lineReq.Qty);
         }
+
         po.UpdateReceiptStatus();
+        _db.PurchaseOrderReceipts.Add(receipt);
+        await _db.SaveChangesAsync(ct);
+
+        return ToReceiptDto(receipt, po);
+    }
+
+    public async Task<IEnumerable<ReceiptDto>> GetReceiptsAsync(Guid poId, CancellationToken ct = default)
+    {
+        var po = await _db.PurchaseOrders
+            .Include(o => o.Lines)
+            .FirstOrDefaultAsync(o => o.Id == poId && !o.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Purchase order not found.");
+
+        var receipts = await _db.PurchaseOrderReceipts
+            .Include(r => r.Lines)
+            .Where(r => r.PurchaseOrderId == poId && !r.IsDeleted)
+            .OrderByDescending(r => r.ReceivedDate)
+            .ToListAsync(ct);
+
+        return receipts.Select(r => ToReceiptDto(r, po));
+    }
+
+    public async Task ClosePurchaseOrderAsync(Guid id, CancellationToken ct = default)
+    {
+        var po = await LoadPOWithLines(id, ct);
+        po.Close();
         await _db.SaveChangesAsync(ct);
     }
 
@@ -237,20 +278,34 @@ public class AccountsPayableService : IAccountsPayableService
             .FirstOrDefaultAsync(o => o.Id == poId && !o.IsDeleted, ct)
             ?? throw new InvalidOperationException("Purchase order not found.");
 
-        if (po.Status != PurchaseOrderStatus.FullyReceived && po.Status != PurchaseOrderStatus.PartiallyReceived)
+        if (po.Status == PurchaseOrderStatus.Draft || po.Status == PurchaseOrderStatus.Sent)
             throw new InvalidOperationException("Goods must be received before generating an AP invoice.");
+        if (po.Status == PurchaseOrderStatus.Cancelled)
+            throw new InvalidOperationException("Cannot invoice a cancelled PO.");
+        if (po.InvoiceStatus == POInvoiceStatus.FullyInvoiced)
+            throw new InvalidOperationException("All received goods have already been invoiced. Receive more goods before generating another invoice.");
 
-        var vendor = po.Vendor!;
+        // Invoice only the received value not yet invoiced (supports partial invoicing)
+        var receivedValue = po.Lines.Sum(l => Math.Round(l.ReceivedQty * l.UnitCost, 4));
+        var receivedTax   = po.Lines.Sum(l => Math.Round(l.ReceivedQty * l.UnitCost * l.TaxRate / 100, 4));
+        var uninvoicedSubTotal = receivedValue - po.InvoicedAmount;
+        var invoiceSubTotal    = Math.Round(uninvoicedSubTotal / (1 + (receivedTax > 0 && receivedValue > 0 ? receivedTax / receivedValue : 0)), 4);
+        var invoiceTax         = Math.Round(uninvoicedSubTotal - invoiceSubTotal, 4);
+
+        if (uninvoicedSubTotal <= 0)
+            throw new InvalidOperationException("No uninvoiced received value to invoice.");
+
+        var vendor  = po.Vendor!;
         var dueDate = DateTime.UtcNow.Date.AddDays(vendor.PaymentTermsDays);
-        var count = await _db.APInvoices.CountAsync(ct) + 1;
+        var count   = await _db.APInvoices.CountAsync(ct) + 1;
 
         var inv = new APInvoice(_org.OrganizationId, $"APINV-{count:D6}", po.VendorId,
             DateTime.UtcNow.Date, dueDate,
-            $"Invoice for {po.PONumber}", vendorInvoiceRef,
-            po.SubTotal, po.TaxTotal, po.Id);
+            $"Invoice for {po.PONumber} (received goods)", vendorInvoiceRef,
+            invoiceSubTotal, invoiceTax, po.Id);
 
         _db.APInvoices.Add(inv);
-        po.Invoice(inv.Id);
+        po.RecordInvoice(uninvoicedSubTotal);   // updates InvoiceStatus; does NOT change receive Status
         await _db.SaveChangesAsync(ct);
 
         var created = await _db.APInvoices
@@ -355,12 +410,25 @@ public class AccountsPayableService : IAccountsPayableService
     private static PurchaseOrderDto ToPODto(PurchaseOrder o) => new(
         o.Id, o.PONumber, o.VendorId, o.Vendor?.Name ?? string.Empty,
         o.OrderDate, o.ExpectedDate, o.Description, o.Currency,
-        o.Status.ToString(), o.SubTotal, o.TaxTotal, o.GrandTotal,
-        o.APInvoiceId, o.CreatedAt,
+        o.Status.ToString(), o.InvoiceStatus.ToString(),
+        o.SubTotal, o.TaxTotal, o.GrandTotal,
+        o.InvoicedAmount, o.CanReceive, o.CreatedAt,
         o.Lines.Select(l => new PurchaseOrderLineDto(
             l.Id, l.ProductVariantId, l.ProductCode, l.Description, l.UnitOfMeasure,
             l.OrderedQty, l.ReceivedQty, l.UnitCost, l.TaxRate,
-            l.LineTotal, l.IsFullyReceived)).ToList());
+            l.LineTotal, l.IsFullyReceived,
+            Math.Max(0, l.OrderedQty - l.ReceivedQty))).ToList());
+
+    private static ReceiptDto ToReceiptDto(PurchaseOrderReceipt r, PurchaseOrder po) => new(
+        r.Id, r.ReceiptNumber, r.ReceivedDate, r.Notes, r.CreatedAt,
+        r.Lines.Select(rl =>
+        {
+            var poLine = po.Lines.FirstOrDefault(l => l.Id == rl.PurchaseOrderLineId);
+            return new ReceiptLineDto(rl.Id, rl.PurchaseOrderLineId,
+                poLine?.ProductCode ?? string.Empty,
+                poLine?.Description ?? string.Empty,
+                rl.Qty);
+        }).ToList());
 
     private static APInvoiceDto ToAPInvoiceDto(APInvoice i) => new(
         i.Id, i.InvoiceNumber, i.VendorId, i.Vendor?.Name ?? string.Empty,

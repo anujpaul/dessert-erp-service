@@ -50,11 +50,13 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<ARPayment>      ARPayments      => Set<ARPayment>();
 
     // Accounts Payable
-    public DbSet<Vendor>             Vendors            => Set<Vendor>();
-    public DbSet<PurchaseOrder>      PurchaseOrders     => Set<PurchaseOrder>();
-    public DbSet<PurchaseOrderLine>  PurchaseOrderLines => Set<PurchaseOrderLine>();
-    public DbSet<APInvoice>          APInvoices         => Set<APInvoice>();
-    public DbSet<APPayment>          APPayments         => Set<APPayment>();
+    public DbSet<Vendor>                    Vendors                   => Set<Vendor>();
+    public DbSet<PurchaseOrder>             PurchaseOrders            => Set<PurchaseOrder>();
+    public DbSet<PurchaseOrderLine>         PurchaseOrderLines        => Set<PurchaseOrderLine>();
+    public DbSet<PurchaseOrderReceipt>      PurchaseOrderReceipts     => Set<PurchaseOrderReceipt>();
+    public DbSet<PurchaseOrderReceiptLine>  PurchaseOrderReceiptLines => Set<PurchaseOrderReceiptLine>();
+    public DbSet<APInvoice>                 APInvoices                => Set<APInvoice>();
+    public DbSet<APPayment>                 APPayments                => Set<APPayment>();
 
     // Retail
     public DbSet<RetailStore>        RetailStores        => Set<RetailStore>();

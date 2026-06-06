@@ -2,7 +2,11 @@ using DessertERP.Domain.Common;
 
 namespace DessertERP.Domain.Modules.AccountsPayable;
 
-public enum PurchaseOrderStatus { Draft, Sent, PartiallyReceived, FullyReceived, Invoiced, Closed, Cancelled }
+/// <summary>Lifecycle status — tracks physical receipt progress.</summary>
+public enum PurchaseOrderStatus { Draft, Sent, PartiallyReceived, FullyReceived, Closed, Cancelled }
+
+/// <summary>Invoice status — independent of receive status (a PO can be partially invoiced and still receive more goods).</summary>
+public enum POInvoiceStatus { NotInvoiced, PartiallyInvoiced, FullyInvoiced }
 
 public class PurchaseOrder : BaseEntity
 {
@@ -14,10 +18,13 @@ public class PurchaseOrder : BaseEntity
     public string Description { get; private set; } = string.Empty;
     public string Currency { get; private set; } = "USD";
     public PurchaseOrderStatus Status { get; private set; } = PurchaseOrderStatus.Draft;
+    public POInvoiceStatus InvoiceStatus { get; private set; } = POInvoiceStatus.NotInvoiced;
     public decimal SubTotal { get; private set; }
     public decimal TaxTotal { get; private set; }
     public decimal GrandTotal { get; private set; }
-    public Guid? APInvoiceId { get; private set; }
+
+    /// <summary>Amount invoiced to date (cumulative across all AP invoices linked to this PO).</summary>
+    public decimal InvoicedAmount { get; private set; }
 
     // Export tracking
     public bool      IsExported { get; private set; }
@@ -27,6 +34,9 @@ public class PurchaseOrder : BaseEntity
 
     private readonly List<PurchaseOrderLine> _lines = new();
     public IReadOnlyCollection<PurchaseOrderLine> Lines => _lines.AsReadOnly();
+
+    private readonly List<PurchaseOrderReceipt> _receipts = new();
+    public IReadOnlyCollection<PurchaseOrderReceipt> Receipts => _receipts.AsReadOnly();
 
     private PurchaseOrder() { }
 
@@ -41,6 +51,60 @@ public class PurchaseOrder : BaseEntity
         Currency = currency;
         ExpectedDate = expectedDate;
     }
+
+    // ── Receiving ─────────────────────────────────────────────────────────────
+
+    /// <summary>True when more goods can still be received (quantities not yet fully received and PO not closed/cancelled).</summary>
+    public bool CanReceive =>
+        Status != PurchaseOrderStatus.Draft &&
+        Status != PurchaseOrderStatus.Closed &&
+        Status != PurchaseOrderStatus.Cancelled &&
+        _lines.Any(l => !l.IsFullyReceived);
+
+    /// <summary>Recalculates receive status from line quantities. Safe to call at any invoice status.</summary>
+    public void UpdateReceiptStatus()
+    {
+        if (Status == PurchaseOrderStatus.Draft || Status == PurchaseOrderStatus.Closed || Status == PurchaseOrderStatus.Cancelled)
+            return;
+
+        bool anyReceived = _lines.Any(l => l.ReceivedQty > 0);
+        bool allReceived = _lines.All(l => l.IsFullyReceived);
+
+        Status = allReceived ? PurchaseOrderStatus.FullyReceived
+               : anyReceived ? PurchaseOrderStatus.PartiallyReceived
+               : PurchaseOrderStatus.Sent;
+
+        SetUpdated();
+    }
+
+    // ── Invoicing ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Records that an invoice has been raised against this PO for <paramref name="invoicedAmount"/>.
+    /// Does NOT change the receive status — a PO can still accept more goods after being partially invoiced.
+    /// </summary>
+    public void RecordInvoice(decimal invoicedAmount)
+    {
+        if (Status == PurchaseOrderStatus.Draft || Status == PurchaseOrderStatus.Cancelled)
+            throw new InvalidOperationException("Cannot invoice a Draft or Cancelled PO.");
+        if (Status == PurchaseOrderStatus.Sent)
+            throw new InvalidOperationException("Goods must be received before invoicing.");
+
+        var receivedValue = _lines.Sum(l => Math.Round(l.ReceivedQty * l.UnitCost * (1 + l.TaxRate / 100), 4));
+        if (InvoicedAmount + invoicedAmount > receivedValue + 0.01m) // 1-cent tolerance
+            throw new InvalidOperationException("Cannot invoice more than the total received value.");
+
+        InvoicedAmount += invoicedAmount;
+
+        // Update invoice status
+        InvoiceStatus = InvoicedAmount >= receivedValue - 0.01m
+            ? POInvoiceStatus.FullyInvoiced
+            : POInvoiceStatus.PartiallyInvoiced;
+
+        SetUpdated();
+    }
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     public PurchaseOrderLine AddLine(Guid productVariantId, string productCode, string description,
         string uom, decimal qty, decimal unitCost, decimal taxRate = 0)
@@ -75,76 +139,50 @@ public class PurchaseOrder : BaseEntity
         SetUpdated();
     }
 
-    public void UpdateReceiptStatus()
-    {
-        if (Status == PurchaseOrderStatus.Sent || Status == PurchaseOrderStatus.PartiallyReceived)
-        {
-            bool allReceived = _lines.All(l => l.IsFullyReceived);
-            Status = allReceived ? PurchaseOrderStatus.FullyReceived : PurchaseOrderStatus.PartiallyReceived;
-            SetUpdated();
-        }
-    }
-
-    public void Invoice(Guid apInvoiceId)
-    {
-        if (Status != PurchaseOrderStatus.FullyReceived && Status != PurchaseOrderStatus.PartiallyReceived)
-            throw new InvalidOperationException("PO must have received goods before invoicing.");
-        Status = PurchaseOrderStatus.Invoiced;
-        APInvoiceId = apInvoiceId;
-        SetUpdated();
-    }
-
     public void Close()
     {
-        if (Status != PurchaseOrderStatus.Invoiced)
-            throw new InvalidOperationException("Only an Invoiced PO can be closed.");
+        if (Status == PurchaseOrderStatus.Draft || Status == PurchaseOrderStatus.Cancelled)
+            throw new InvalidOperationException("Cannot close a Draft or Cancelled PO.");
+        if (InvoiceStatus != POInvoiceStatus.FullyInvoiced)
+            throw new InvalidOperationException("PO must be fully invoiced before closing.");
         Status = PurchaseOrderStatus.Closed;
-        SetUpdated();
-    }
-
-    public void MarkExported()
-    {
-        IsExported = true;
-        ExportedAt = DateTime.UtcNow;
-        SetUpdated();
-    }
-
-    public void ResetExport()
-    {
-        IsExported = false;
-        ExportedAt = null;
         SetUpdated();
     }
 
     public void Cancel()
     {
-        if (Status == PurchaseOrderStatus.FullyReceived || Status == PurchaseOrderStatus.Invoiced || Status == PurchaseOrderStatus.Closed)
-            throw new InvalidOperationException("Cannot cancel a PO that has been received or invoiced.");
+        if (Status == PurchaseOrderStatus.FullyReceived || Status == PurchaseOrderStatus.Closed)
+            throw new InvalidOperationException("Cannot cancel a PO that has been fully received or closed.");
+        if (InvoiceStatus != POInvoiceStatus.NotInvoiced)
+            throw new InvalidOperationException("Cannot cancel a PO that has already been invoiced.");
         Status = PurchaseOrderStatus.Cancelled;
         SetUpdated();
     }
 
-    /// <summary>Called by the service layer when removing a line without loading the collection.</summary>
+    public void MarkExported()  { IsExported = true; ExportedAt = DateTime.UtcNow; SetUpdated(); }
+    public void ResetExport()   { IsExported = false; ExportedAt = null; SetUpdated(); }
+
+    // ── Service-layer helpers ─────────────────────────────────────────────────
+
     public void ValidateCanRemoveLine()
     {
         if (Status != PurchaseOrderStatus.Draft)
             throw new InvalidOperationException("Lines can only be removed from a Draft PO.");
     }
 
-    /// <summary>Recalculates totals from an externally-supplied list of remaining lines.</summary>
     public void RecalcTotalsFromLines(IEnumerable<PurchaseOrderLine> lines)
     {
         var list = lines.ToList();
-        SubTotal = list.Sum(l => Math.Round(l.OrderedQty * l.UnitCost, 4));
-        TaxTotal = list.Sum(l => Math.Round(l.OrderedQty * l.UnitCost * l.TaxRate / 100, 4));
+        SubTotal   = list.Sum(l => Math.Round(l.OrderedQty * l.UnitCost, 4));
+        TaxTotal   = list.Sum(l => Math.Round(l.OrderedQty * l.UnitCost * l.TaxRate / 100, 4));
         GrandTotal = SubTotal + TaxTotal;
         SetUpdated();
     }
 
     private void RecalcTotals()
     {
-        SubTotal = _lines.Sum(l => Math.Round(l.OrderedQty * l.UnitCost, 4));
-        TaxTotal = _lines.Sum(l => Math.Round(l.OrderedQty * l.UnitCost * l.TaxRate / 100, 4));
+        SubTotal   = _lines.Sum(l => Math.Round(l.OrderedQty * l.UnitCost, 4));
+        TaxTotal   = _lines.Sum(l => Math.Round(l.OrderedQty * l.UnitCost * l.TaxRate / 100, 4));
         GrandTotal = SubTotal + TaxTotal;
     }
 }

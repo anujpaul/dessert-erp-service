@@ -24,6 +24,20 @@ public class AccountsReceivableController : ControllerBase
     public async Task<IActionResult> CreateCustomer([FromBody] CreateCustomerRequest req, CancellationToken ct)
         => StatusCode(201, await _svc.CreateCustomerAsync(req, ct));
 
+    [HttpPut("customers/{id:guid}")]
+    public async Task<IActionResult> UpdateCustomer(Guid id, [FromBody] UpdateCustomerRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.UpdateCustomerAsync(id, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    //[HttpGet("customers/{id:guid}/ledger")]
+    //public async Task<IActionResult> GetCustomerLedger(Guid id, CancellationToken ct)
+    //{
+    //    try { return Ok(await _svc.GetCustomerLedgerAsync(id, ct)); }
+    //    catch (InvalidOperationException ex) { return NotFound(new { error = ex.Message }); }
+    //}
+
     // ── Sales Orders ──────────────────────────────────────────────────────────
 
     [HttpGet("sales-orders")]
@@ -146,7 +160,82 @@ public class AccountsReceivableController : ControllerBase
 
     // ── Reports ───────────────────────────────────────────────────────────────
 
-    [HttpGet("reports/aging")]
-    public async Task<IActionResult> GetAgingReport(CancellationToken ct)
+    [HttpGet("aging")]
+    public async Task<IActionResult> GetAging(CancellationToken ct)
         => Ok(await _svc.GetAgingReportAsync(ct));
+
+    [HttpGet("customers/{id:guid}/ledger")]
+    public async Task<IActionResult> GetCustomerLedger(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.GetCustomerLedgerAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    // ── Customer Addresses ────────────────────────────────────────────────────
+
+    [HttpGet("customers/{customerId:guid}/addresses")]
+    public async Task<IActionResult> GetAddresses(Guid customerId, CancellationToken ct)
+        => Ok(await _svc.GetCustomerAddressesAsync(customerId, ct));
+
+    [HttpPost("customers/{customerId:guid}/addresses")]
+    public async Task<IActionResult> CreateAddress(Guid customerId, [FromBody] SaveCustomerAddressRequest req, CancellationToken ct)
+    {
+        try { return StatusCode(201, await _svc.SaveCustomerAddressAsync(customerId, null, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPut("customers/{customerId:guid}/addresses/{addressId:guid}")]
+    public async Task<IActionResult> UpdateAddress(Guid customerId, Guid addressId, [FromBody] SaveCustomerAddressRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.SaveCustomerAddressAsync(customerId, addressId, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpDelete("customers/{customerId:guid}/addresses/{addressId:guid}")]
+    public async Task<IActionResult> DeleteAddress(Guid customerId, Guid addressId, CancellationToken ct)
+    {
+        try { await _svc.DeleteCustomerAddressAsync(customerId, addressId, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    [HttpPost("customers/{customerId:guid}/addresses/{addressId:guid}/set-primary")]
+    public async Task<IActionResult> SetPrimaryAddress(Guid customerId, Guid addressId, CancellationToken ct)
+    {
+        try { await _svc.SetPrimaryCustomerAddressAsync(customerId, addressId, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    // ── Customer Contacts ─────────────────────────────────────────────────────
+
+    [HttpGet("customers/{customerId:guid}/contacts")]
+    public async Task<IActionResult> GetContacts(Guid customerId, CancellationToken ct)
+        => Ok(await _svc.GetCustomerContactsAsync(customerId, ct));
+
+    [HttpPost("customers/{customerId:guid}/contacts")]
+    public async Task<IActionResult> CreateContact(Guid customerId, [FromBody] SaveCustomerContactRequest req, CancellationToken ct)
+    {
+        try { return StatusCode(201, await _svc.SaveCustomerContactAsync(customerId, null, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPut("customers/{customerId:guid}/contacts/{contactId:guid}")]
+    public async Task<IActionResult> UpdateContact(Guid customerId, Guid contactId, [FromBody] SaveCustomerContactRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.SaveCustomerContactAsync(customerId, contactId, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpDelete("customers/{customerId:guid}/contacts/{contactId:guid}")]
+    public async Task<IActionResult> DeleteContact(Guid customerId, Guid contactId, CancellationToken ct)
+    {
+        try { await _svc.DeleteCustomerContactAsync(customerId, contactId, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    [HttpPost("customers/{customerId:guid}/contacts/{contactId:guid}/set-primary")]
+    public async Task<IActionResult> SetPrimaryContact(Guid customerId, Guid contactId, CancellationToken ct)
+    {
+        try { await _svc.SetPrimaryCustomerContactAsync(customerId, contactId, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return NotFound(new { error = ex.Message }); }
+    }
 }

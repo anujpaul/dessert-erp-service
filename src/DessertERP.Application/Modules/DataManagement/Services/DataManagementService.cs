@@ -426,6 +426,7 @@ public class DataManagementService : IDataManagementService
                 Get(d, VendorFields.Email),
                 Get(d, VendorFields.Phone),
                 BuildAddress(d),
+                null,
                 GetInt(d, VendorFields.PaymentTermsDays, 30),
                 Get(d, VendorFields.BankAccountName),
                 Get(d, VendorFields.BankAccountNumber));

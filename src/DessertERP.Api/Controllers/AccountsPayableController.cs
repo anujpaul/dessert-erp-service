@@ -151,23 +151,23 @@ public class AccountsPayableController : ControllerBase
         catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
     }
 
-    /// <summary>Apply a prepayment invoice to reduce the outstanding balance on this final invoice.</summary>
-    [HttpPost("invoices/{id:guid}/apply-prepayment/{prepaymentId:guid}")]
-    public async Task<IActionResult> ApplyPrepayment(Guid id, Guid prepaymentId, CancellationToken ct)
+    /// <summary>Apply an existing prepayment invoice to a standard AP invoice (offset).</summary>
+    [HttpPost("invoices/{id:guid}/apply-prepayment")]
+    public async Task<IActionResult> ApplyPrepayment(Guid id, [FromBody] ApplyPrepaymentRequest req, CancellationToken ct)
     {
-        try { return Ok(await _svc.ApplyPrepaymentAsync(id, prepaymentId, ct)); }
+        try { return Ok(await _svc.ApplyPrepaymentAsync(id, req.PrepaymentInvoiceId, ct)); }
         catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
     }
 
     [HttpPost("invoices/{id:guid}/approve")]
-    public async Task<IActionResult> Approve(Guid id, CancellationToken ct)
+    public async Task<IActionResult> ApproveInvoice(Guid id, CancellationToken ct)
     {
         try { await _svc.ApproveInvoiceAsync(id, ct); return NoContent(); }
         catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
     }
 
     [HttpPost("invoices/{id:guid}/void")]
-    public async Task<IActionResult> Void(Guid id, CancellationToken ct)
+    public async Task<IActionResult> VoidInvoice(Guid id, CancellationToken ct)
     {
         try { await _svc.VoidInvoiceAsync(id, ct); return NoContent(); }
         catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
@@ -188,7 +188,82 @@ public class AccountsPayableController : ControllerBase
 
     // ── Reports ───────────────────────────────────────────────────────────────
 
-    [HttpGet("reports/aging")]
-    public async Task<IActionResult> GetAgingReport(CancellationToken ct)
+    [HttpGet("aging")]
+    public async Task<IActionResult> GetAging(CancellationToken ct)
         => Ok(await _svc.GetAgingReportAsync(ct));
+
+    [HttpGet("vendors/{id:guid}/ledger")]
+    public async Task<IActionResult> GetVendorLedger(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.GetVendorLedgerAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    // ── Vendor Addresses ──────────────────────────────────────────────────────
+
+    [HttpGet("vendors/{vendorId:guid}/addresses")]
+    public async Task<IActionResult> GetVendorAddresses(Guid vendorId, CancellationToken ct)
+        => Ok(await _svc.GetVendorAddressesAsync(vendorId, ct));
+
+    [HttpPost("vendors/{vendorId:guid}/addresses")]
+    public async Task<IActionResult> CreateVendorAddress(Guid vendorId, [FromBody] SaveVendorAddressRequest req, CancellationToken ct)
+    {
+        try { return StatusCode(201, await _svc.SaveVendorAddressAsync(vendorId, null, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPut("vendors/{vendorId:guid}/addresses/{addressId:guid}")]
+    public async Task<IActionResult> UpdateVendorAddress(Guid vendorId, Guid addressId, [FromBody] SaveVendorAddressRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.SaveVendorAddressAsync(vendorId, addressId, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpDelete("vendors/{vendorId:guid}/addresses/{addressId:guid}")]
+    public async Task<IActionResult> DeleteVendorAddress(Guid vendorId, Guid addressId, CancellationToken ct)
+    {
+        try { await _svc.DeleteVendorAddressAsync(vendorId, addressId, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    [HttpPost("vendors/{vendorId:guid}/addresses/{addressId:guid}/set-primary")]
+    public async Task<IActionResult> SetPrimaryVendorAddress(Guid vendorId, Guid addressId, CancellationToken ct)
+    {
+        try { await _svc.SetPrimaryVendorAddressAsync(vendorId, addressId, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    // ── Vendor Contacts ───────────────────────────────────────────────────────
+
+    [HttpGet("vendors/{vendorId:guid}/contacts")]
+    public async Task<IActionResult> GetVendorContacts(Guid vendorId, CancellationToken ct)
+        => Ok(await _svc.GetVendorContactsAsync(vendorId, ct));
+
+    [HttpPost("vendors/{vendorId:guid}/contacts")]
+    public async Task<IActionResult> CreateVendorContact(Guid vendorId, [FromBody] SaveVendorContactRequest req, CancellationToken ct)
+    {
+        try { return StatusCode(201, await _svc.SaveVendorContactAsync(vendorId, null, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPut("vendors/{vendorId:guid}/contacts/{contactId:guid}")]
+    public async Task<IActionResult> UpdateVendorContact(Guid vendorId, Guid contactId, [FromBody] SaveVendorContactRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.SaveVendorContactAsync(vendorId, contactId, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpDelete("vendors/{vendorId:guid}/contacts/{contactId:guid}")]
+    public async Task<IActionResult> DeleteVendorContact(Guid vendorId, Guid contactId, CancellationToken ct)
+    {
+        try { await _svc.DeleteVendorContactAsync(vendorId, contactId, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    [HttpPost("vendors/{vendorId:guid}/contacts/{contactId:guid}/set-primary")]
+    public async Task<IActionResult> SetPrimaryVendorContact(Guid vendorId, Guid contactId, CancellationToken ct)
+    {
+        try { await _svc.SetPrimaryVendorContactAsync(vendorId, contactId, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return NotFound(new { error = ex.Message }); }
+    }
 }

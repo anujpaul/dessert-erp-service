@@ -16,6 +16,10 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         b.Property(e => e.Email).HasMaxLength(200);
         b.Property(e => e.Phone).HasMaxLength(50);
         b.Property(e => e.Address).HasMaxLength(500);
+        b.Property(e => e.BillingAddress).HasMaxLength(500);
+        b.Property(e => e.ShippingAddress).HasMaxLength(500);
+        b.Property(e => e.Website).HasMaxLength(200);
+        b.Property(e => e.Notes).HasMaxLength(1000);
         b.Property(e => e.Currency).HasMaxLength(3);
         b.Property(e => e.CreditLimit).HasColumnType("numeric(18,4)");
         b.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
@@ -114,5 +118,46 @@ public class ARPaymentConfiguration : IEntityTypeConfiguration<ARPayment>
         b.HasOne(e => e.Customer).WithMany().HasForeignKey(e => e.CustomerId);
         b.HasOne(e => e.ARInvoice).WithMany().HasForeignKey(e => e.ARInvoiceId);
         // Query filter applied in AppDbContext.OnModelCreating
+    }
+}
+
+public class CustomerAddressConfiguration : IEntityTypeConfiguration<CustomerAddress>
+{
+    public void Configure(EntityTypeBuilder<CustomerAddress> b)
+    {
+        b.ToTable("customer_addresses");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.OrganizationId).IsRequired();
+        b.Property(e => e.Label).HasMaxLength(100).IsRequired();
+        b.Property(e => e.AddressType).HasConversion<string>().HasMaxLength(20);
+        b.Property(e => e.Line1).HasMaxLength(300).IsRequired();
+        b.Property(e => e.Line2).HasMaxLength(300);
+        b.Property(e => e.City).HasMaxLength(100).IsRequired();
+        b.Property(e => e.State).HasMaxLength(100);
+        b.Property(e => e.PostalCode).HasMaxLength(20);
+        b.Property(e => e.Country).HasMaxLength(100);
+        b.Ignore(e => e.SingleLine);
+        b.HasOne(e => e.Customer).WithMany(c => c.Addresses)
+            .HasForeignKey(e => e.CustomerId).OnDelete(DeleteBehavior.Cascade);
+        b.HasQueryFilter(e => !e.IsDeleted);
+    }
+}
+
+public class CustomerContactConfiguration : IEntityTypeConfiguration<CustomerContact>
+{
+    public void Configure(EntityTypeBuilder<CustomerContact> b)
+    {
+        b.ToTable("customer_contacts");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.OrganizationId).IsRequired();
+        b.Property(e => e.Name).HasMaxLength(200).IsRequired();
+        b.Property(e => e.Title).HasMaxLength(150);
+        b.Property(e => e.Email).HasMaxLength(200);
+        b.Property(e => e.Phone).HasMaxLength(50);
+        b.Property(e => e.Mobile).HasMaxLength(50);
+        b.Property(e => e.Notes).HasMaxLength(500);
+        b.HasOne(e => e.Customer).WithMany(c => c.Contacts)
+            .HasForeignKey(e => e.CustomerId).OnDelete(DeleteBehavior.Cascade);
+        b.HasQueryFilter(e => !e.IsDeleted);
     }
 }

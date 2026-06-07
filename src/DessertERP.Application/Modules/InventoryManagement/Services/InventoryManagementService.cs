@@ -1,0 +1,323 @@
+using DessertERP.Application.Common.Interfaces;
+using DessertERP.Application.Modules.InventoryManagement.DTOs;
+using DessertERP.Domain.Modules.ProductManagement;
+using Microsoft.EntityFrameworkCore;
+
+namespace DessertERP.Application.Modules.InventoryManagement.Services;
+
+// ── Interface ────────────────────────────────────────────────────────────────
+
+public interface IInventoryManagementService
+{
+    // List / detail
+    Task<IEnumerable<InventoryItemDto>> GetItemsAsync(string? search = null, string? filter = null, CancellationToken ct = default);
+    Task<InventoryItemDto>              GetItemAsync(Guid inventoryRecordId, CancellationToken ct = default);
+    Task<InventorySummaryDto>           GetSummaryAsync(CancellationToken ct = default);
+
+    // Transactions
+    Task<IEnumerable<InventoryTransactionDto>> GetTransactionsAsync(Guid productVariantId, int take = 100, CancellationToken ct = default);
+    Task<IEnumerable<InventoryTransactionDto>> GetRecentTransactionsAsync(int take = 50, CancellationToken ct = default);
+
+    // Adjustments
+    Task<InventoryItemDto> AdjustStockAsync(Guid inventoryRecordId, AdjustStockRequest req, CancellationToken ct = default);
+    Task<InventoryItemDto> SetOnHandAsync(Guid inventoryRecordId, SetOnHandRequest req, CancellationToken ct = default);
+    Task<InventoryItemDto> UpdateThresholdsAsync(Guid inventoryRecordId, UpdateThresholdsRequest req, CancellationToken ct = default);
+
+    // Reports
+    Task<IEnumerable<LowStockItemDto>>    GetLowStockAsync(CancellationToken ct = default);
+    Task<IEnumerable<StockValuationDto>>  GetValuationByCategory(CancellationToken ct = default);
+}
+
+// ── Implementation ────────────────────────────────────────────────────────────
+
+public class InventoryManagementService : IInventoryManagementService
+{
+    private readonly IAppDbContext _db;
+
+    public InventoryManagementService(IAppDbContext db) => _db = db;
+
+    // ── List / detail ─────────────────────────────────────────────────────────
+
+    public async Task<IEnumerable<InventoryItemDto>> GetItemsAsync(
+        string? search = null, string? filter = null, CancellationToken ct = default)
+    {
+        var query = _db.InventoryRecords
+            .Include(r => r.ProductVariant)
+                .ThenInclude(v => v!.Product)
+                    .ThenInclude(p => p!.Category)
+            .Include(r => r.ProductVariant)
+                .ThenInclude(v => v!.Product)
+                    .ThenInclude(p => p!.Brand)
+            .AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim().ToLower();
+            query = query.Where(r =>
+                r.ProductVariant!.Sku.ToLower().Contains(s) ||
+                r.ProductVariant.Product!.Name.ToLower().Contains(s));
+        }
+
+        if (filter == "low-stock")
+            query = query.Where(r => r.QuantityOnHand <= r.ReorderPoint && r.QuantityOnHand > 0);
+        else if (filter == "out-of-stock")
+            query = query.Where(r => r.QuantityOnHand <= 0);
+        else if (filter == "on-order")
+            query = query.Where(r => r.QuantityOnOrder > 0);
+
+        var records = await query.OrderBy(r => r.ProductVariant!.Sku).ToListAsync(ct);
+        return records.Select(ToDto);
+    }
+
+    public async Task<InventoryItemDto> GetItemAsync(Guid inventoryRecordId, CancellationToken ct = default)
+    {
+        var r = await _db.InventoryRecords
+            .Include(r => r.ProductVariant)
+                .ThenInclude(v => v!.Product)
+                    .ThenInclude(p => p!.Category)
+            .Include(r => r.ProductVariant)
+                .ThenInclude(v => v!.Product)
+                    .ThenInclude(p => p!.Brand)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Id == inventoryRecordId, ct)
+            ?? throw new InvalidOperationException("Inventory record not found.");
+        return ToDto(r);
+    }
+
+    public async Task<InventorySummaryDto> GetSummaryAsync(CancellationToken ct = default)
+    {
+        var records = await _db.InventoryRecords.AsNoTracking().ToListAsync(ct);
+        return new InventorySummaryDto(
+            TotalSkus:       records.Count,
+            LowStockCount:   records.Count(r => r.QuantityOnHand <= r.ReorderPoint && r.QuantityOnHand > 0),
+            OutOfStockCount: records.Count(r => r.QuantityOnHand <= 0),
+            TotalStockValue: records.Sum(r => r.QuantityOnHand * r.AverageCost),
+            OnOrderLines:    records.Count(r => r.QuantityOnOrder > 0)
+        );
+    }
+
+    // ── Transactions ──────────────────────────────────────────────────────────
+
+    public async Task<IEnumerable<InventoryTransactionDto>> GetTransactionsAsync(
+        Guid productVariantId, int take = 100, CancellationToken ct = default)
+    {
+        var txns = await _db.InventoryTransactions
+            .Include(t => t.ProductVariant)
+            .AsNoTracking()
+            .Where(t => t.ProductVariantId == productVariantId)
+            .OrderByDescending(t => t.TransactionDate)
+            .Take(take)
+            .ToListAsync(ct);
+        return txns.Select(ToTxnDto);
+    }
+
+    public async Task<IEnumerable<InventoryTransactionDto>> GetRecentTransactionsAsync(
+        int take = 50, CancellationToken ct = default)
+    {
+        var txns = await _db.InventoryTransactions
+            .Include(t => t.ProductVariant)
+            .AsNoTracking()
+            .OrderByDescending(t => t.TransactionDate)
+            .Take(take)
+            .ToListAsync(ct);
+        return txns.Select(ToTxnDto);
+    }
+
+    // ── Adjustments ───────────────────────────────────────────────────────────
+
+    public async Task<InventoryItemDto> AdjustStockAsync(
+        Guid inventoryRecordId, AdjustStockRequest req, CancellationToken ct = default)
+    {
+        var record = await LoadRecord(inventoryRecordId, ct);
+
+        InventoryTransactionType txnType;
+        if (req.Quantity > 0)
+        {
+            txnType = InventoryTransactionType.AdjustmentIn;
+            record.ReceiveStock(req.Quantity, req.UnitCost);
+        }
+        else if (req.Quantity < 0)
+        {
+            txnType = InventoryTransactionType.AdjustmentOut;
+            record.IssueStock(Math.Abs(req.Quantity));
+        }
+        else
+        {
+            throw new InvalidOperationException("Adjustment quantity cannot be zero.");
+        }
+
+        _db.InventoryTransactions.Add(new InventoryTransaction(
+            record.OrganizationId,
+            record.ProductVariantId,
+            txnType,
+            req.Quantity,
+            req.UnitCost,
+            record.QuantityOnHand,
+            referenceNumber: "ADJ",
+            notes: req.Notes,
+            createdBy: req.CreatedBy));
+
+        await _db.SaveChangesAsync(ct);
+        return await GetItemAsync(inventoryRecordId, ct);
+    }
+
+    public async Task<InventoryItemDto> SetOnHandAsync(
+        Guid inventoryRecordId, SetOnHandRequest req, CancellationToken ct = default)
+    {
+        var record = await LoadRecord(inventoryRecordId, ct);
+        var delta  = req.Quantity - record.QuantityOnHand;
+
+        // Cycle count: set absolute quantity and optionally refresh average cost
+        if (req.UnitCost > 0 && req.Quantity > 0)
+        {
+            // Receive the delta to update weighted avg cost, then fix quantity to exact target
+            if (delta > 0)
+                record.ReceiveStock(delta, req.UnitCost);
+            else if (delta < 0)
+                record.IssueStock(Math.Abs(delta));
+            // After the movement quantity is already at req.Quantity; stamp the count date
+            record.SetOnHand(req.Quantity, DateTime.UtcNow);
+        }
+        else
+        {
+            record.SetOnHand(req.Quantity, DateTime.UtcNow);
+        }
+
+        var txnType = delta >= 0 ? InventoryTransactionType.AdjustmentIn : InventoryTransactionType.AdjustmentOut;
+
+        _db.InventoryTransactions.Add(new InventoryTransaction(
+            record.OrganizationId,
+            record.ProductVariantId,
+            txnType,
+            delta,
+            req.UnitCost,
+            record.QuantityOnHand,
+            referenceNumber: "CYCLE-COUNT",
+            notes: req.Notes ?? "Cycle count adjustment",
+            createdBy: req.CreatedBy));
+
+        await _db.SaveChangesAsync(ct);
+        return await GetItemAsync(inventoryRecordId, ct);
+    }
+
+    public async Task<InventoryItemDto> UpdateThresholdsAsync(
+        Guid inventoryRecordId, UpdateThresholdsRequest req, CancellationToken ct = default)
+    {
+        var record = await LoadRecord(inventoryRecordId, ct);
+        record.SetThresholds(req.ReorderPoint, req.MinimumStock, req.MaximumStock, req.Location);
+        await _db.SaveChangesAsync(ct);
+        return await GetItemAsync(inventoryRecordId, ct);
+    }
+
+    // ── Reports ───────────────────────────────────────────────────────────────
+
+    public async Task<IEnumerable<LowStockItemDto>> GetLowStockAsync(CancellationToken ct = default)
+    {
+        var records = await _db.InventoryRecords
+            .Include(r => r.ProductVariant)
+                .ThenInclude(v => v!.Product)
+                    .ThenInclude(p => p!.Category)
+            .AsNoTracking()
+            .Where(r => r.QuantityOnHand <= r.ReorderPoint)
+            .OrderBy(r => r.QuantityOnHand)
+            .ToListAsync(ct);
+
+        // Get preferred vendor names separately to avoid complex EF navigation
+        var vendorIds = records
+            .Where(r => r.ProductVariant?.Product?.PreferredVendorId != null)
+            .Select(r => r.ProductVariant!.Product!.PreferredVendorId!.Value)
+            .Distinct()
+            .ToList();
+
+        var vendors = vendorIds.Count > 0
+            ? await _db.Vendors.AsNoTracking()
+                .Where(v => vendorIds.Contains(v.Id))
+                .ToDictionaryAsync(v => v.Id, v => v.Name, ct)
+            : new Dictionary<Guid, string>();
+
+        return records.Select(r =>
+        {
+            var vendorName = r.ProductVariant?.Product?.PreferredVendorId != null
+                && vendors.TryGetValue(r.ProductVariant.Product.PreferredVendorId.Value, out var vn) ? vn : null;
+            return new LowStockItemDto(
+                r.ProductVariantId,
+                r.ProductVariant?.Sku ?? "",
+                r.ProductVariant?.Product?.Name ?? "",
+                BuildVariantDesc(r.ProductVariant),
+                r.QuantityOnHand,
+                r.ReorderPoint,
+                r.QuantityOnOrder,
+                vendorName);
+        });
+    }
+
+    public async Task<IEnumerable<StockValuationDto>> GetValuationByCategory(CancellationToken ct = default)
+    {
+        var records = await _db.InventoryRecords
+            .Include(r => r.ProductVariant)
+                .ThenInclude(v => v!.Product)
+                    .ThenInclude(p => p!.Category)
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        return records
+            .GroupBy(r => r.ProductVariant?.Product?.Category?.Name ?? "Uncategorized")
+            .Select(g => new StockValuationDto(
+                Category:    g.Key,
+                SkuCount:    g.Count(),
+                TotalOnHand: g.Sum(r => r.QuantityOnHand),
+                TotalValue:  g.Sum(r => r.QuantityOnHand * r.AverageCost)))
+            .OrderByDescending(v => v.TotalValue);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private async Task<InventoryRecord> LoadRecord(Guid id, CancellationToken ct)
+    {
+        return await _db.InventoryRecords
+            .FirstOrDefaultAsync(r => r.Id == id, ct)
+            ?? throw new InvalidOperationException("Inventory record not found.");
+    }
+
+    private static string? BuildVariantDesc(ProductVariant? v)
+    {
+        if (v == null) return null;
+        var parts = new[] { v.Color, v.Size, v.Material }.Where(s => !string.IsNullOrWhiteSpace(s));
+        return string.Join(" / ", parts);
+    }
+
+    private static InventoryItemDto ToDto(InventoryRecord r)
+    {
+        var v = r.ProductVariant;
+        var p = v?.Product;
+        return new InventoryItemDto(
+            Id:                 r.Id,
+            ProductVariantId:   r.ProductVariantId,
+            Sku:                v?.Sku ?? "",
+            ProductName:        p?.Name ?? "",
+            VariantDescription: BuildVariantDesc(v),
+            Category:           p?.Category?.Name,
+            Brand:              p?.Brand?.Name,
+            UnitOfMeasure:      p?.UnitOfMeasure ?? "Each",
+            OnHand:             r.QuantityOnHand,
+            Reserved:           r.QuantityReserved,
+            OnOrder:            r.QuantityOnOrder,
+            Available:          r.QuantityAvailable,
+            Projected:          r.QuantityProjected,
+            ReorderPoint:       r.ReorderPoint,
+            MinimumStock:       r.MinimumStock,
+            MaximumStock:       r.MaximumStock,
+            AverageCost:        r.AverageCost,
+            StockValue:         r.StockValue,
+            Location:           r.Location,
+            LastCountDate:      r.LastCountDate,
+            LastReceivedDate:   r.LastReceivedDate,
+            NeedsReorder:       r.NeedsReorder,
+            IsOutOfStock:       r.IsOutOfStock);
+    }
+
+    private static InventoryTransactionDto ToTxnDto(InventoryTransaction t) =>
+        new(t.Id, t.ProductVariantId, t.ProductVariant?.Sku ?? "",
+            t.TransactionType.ToString(), t.Quantity, t.UnitCost, t.BalanceAfter,
+            t.ReferenceNumber, t.ReferenceDocumentId, t.Notes, t.CreatedBy, t.TransactionDate);
+}

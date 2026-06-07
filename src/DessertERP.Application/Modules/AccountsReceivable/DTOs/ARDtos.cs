@@ -1,15 +1,64 @@
 namespace DessertERP.Application.Modules.AccountsReceivable.DTOs;
 
+// ── Customer Address / Contact ────────────────────────────────────────────────
+public record CustomerAddressDto(
+    Guid Id, string Label, string AddressType, bool IsPrimary,
+    string Line1, string? Line2, string City, string? State,
+    string? PostalCode, string Country, string SingleLine);
+
+public record CustomerContactDto(
+    Guid Id, string Name, string? Title,
+    string? Email, string? Phone, string? Mobile,
+    bool IsPrimary, string? Notes);
+
+public record SaveCustomerAddressRequest(
+    string Label, string AddressType, string Line1, string? Line2,
+    string City, string? State, string? PostalCode, string Country = "US");
+
+public record SaveCustomerContactRequest(
+    string Name, string? Title, string? Email,
+    string? Phone, string? Mobile, string? Notes);
+
 // ── Customer ──────────────────────────────────────────────────────────────────
-public record CustomerDto(Guid Id, string CustomerNumber, string Name,
-    string? Email, string? Phone, string? Address,
+public record CustomerDto(
+    Guid Id, string CustomerNumber, string Name,
+    string? Email, string? Phone,
+    string? BillingAddress, string? ShippingAddress,
+    string? Website, string? Notes,
     string Currency, int PaymentTermsDays, decimal CreditLimit,
-    string Status, DateTime CreatedAt);
+    // Balance snapshot (computed on fetch)
+    decimal OutstandingBalance, decimal CreditUsed, decimal CreditAvailable,
+    string Status, DateTime CreatedAt,
+    IReadOnlyList<CustomerAddressDto>? Addresses = null,
+    IReadOnlyList<CustomerContactDto>? Contacts = null);
 
 public record CreateCustomerRequest(
     string Name, string? Email = null, string? Phone = null,
-    string? Address = null, string Currency = "USD",
-    int PaymentTermsDays = 30, decimal CreditLimit = 10000m);
+    string? BillingAddress = null, string? ShippingAddress = null,
+    string Currency = "USD", int PaymentTermsDays = 30, decimal CreditLimit = 10000m,
+    string? Website = null, string? Notes = null);
+
+public record UpdateCustomerRequest(
+    string Name, string? Email, string? Phone,
+    string? BillingAddress, string? ShippingAddress,
+    int PaymentTermsDays, decimal CreditLimit,
+    string? Website = null, string? Notes = null);
+
+// ── Customer Ledger ───────────────────────────────────────────────────────────
+public record CustomerLedgerEntryDto(
+    string EntryType,          // "Invoice" or "Payment"
+    string Reference,          // invoice/payment number
+    DateTime Date,
+    decimal Debit,             // invoice total (charge)
+    decimal Credit,            // payment amount
+    decimal RunningBalance,
+    string Status,
+    string? SalesOrderNumber);
+
+public record CustomerLedgerDto(
+    Guid CustomerId, string CustomerName, string CustomerNumber,
+    decimal TotalInvoiced, decimal TotalPaid, decimal OutstandingBalance,
+    IReadOnlyList<CustomerLedgerEntryDto> Entries);
 
 // ── Sales Order ───────────────────────────────────────────────────────────────
 public record SalesOrderLineDto(Guid Id, Guid ProductVariantId, string Sku,

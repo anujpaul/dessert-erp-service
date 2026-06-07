@@ -364,7 +364,7 @@ public class ProductManagementService : IProductManagementService
         var inv = await _db.InventoryRecords
             .FirstOrDefaultAsync(i => i.ProductVariantId == variantId && !i.IsDeleted, ct)
             ?? throw new InvalidOperationException("Inventory record not found.");
-        inv.UpdateThresholds(req.ReorderPoint, req.MinimumStock, req.MaximumStock, req.Location);
+        inv.SetThresholds(req.ReorderPoint, req.MinimumStock, req.MaximumStock, req.Location);
         await _db.SaveChangesAsync(ct);
     }
 

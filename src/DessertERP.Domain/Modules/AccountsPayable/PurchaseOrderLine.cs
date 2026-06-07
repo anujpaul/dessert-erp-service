@@ -15,9 +15,10 @@ public class PurchaseOrderLine : BaseEntity
     public decimal TaxRate { get; private set; }
 
     // Computed
-    public decimal LineTotal => Math.Round(OrderedQty * UnitCost * (1 + TaxRate / 100), 4);
-    public decimal ReceivedTotal => Math.Round(ReceivedQty * UnitCost * (1 + TaxRate / 100), 4);
-    public bool IsFullyReceived => ReceivedQty >= OrderedQty;
+    public decimal LineTotal      => Math.Round(OrderedQty  * UnitCost * (1 + TaxRate / 100), 4);
+    public decimal ReceivedTotal  => Math.Round(ReceivedQty * UnitCost * (1 + TaxRate / 100), 4);
+    public decimal OutstandingQty => OrderedQty - ReceivedQty;
+    public bool    IsFullyReceived => ReceivedQty >= OrderedQty;
 
     public PurchaseOrder? PurchaseOrder { get; private set; }
 

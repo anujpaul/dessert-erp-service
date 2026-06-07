@@ -41,8 +41,21 @@ public interface IAccountsPayableService
     Task<IEnumerable<APPaymentDto>> GetPaymentsAsync(Guid? vendorId = null, CancellationToken ct = default);
     Task<APPaymentDto> CreatePaymentAsync(CreateAPPaymentRequest req, CancellationToken ct = default);
 
+    // Vendor Addresses
+    Task<IEnumerable<VendorAddressDto>> GetVendorAddressesAsync(Guid vendorId, CancellationToken ct = default);
+    Task<VendorAddressDto> SaveVendorAddressAsync(Guid vendorId, Guid? addressId, SaveVendorAddressRequest req, CancellationToken ct = default);
+    Task DeleteVendorAddressAsync(Guid vendorId, Guid addressId, CancellationToken ct = default);
+    Task SetPrimaryVendorAddressAsync(Guid vendorId, Guid addressId, CancellationToken ct = default);
+
+    // Vendor Contacts
+    Task<IEnumerable<VendorContactDto>> GetVendorContactsAsync(Guid vendorId, CancellationToken ct = default);
+    Task<VendorContactDto> SaveVendorContactAsync(Guid vendorId, Guid? contactId, SaveVendorContactRequest req, CancellationToken ct = default);
+    Task DeleteVendorContactAsync(Guid vendorId, Guid contactId, CancellationToken ct = default);
+    Task SetPrimaryVendorContactAsync(Guid vendorId, Guid contactId, CancellationToken ct = default);
+
     // Reports
     Task<IEnumerable<APAgingDto>> GetAgingReportAsync(CancellationToken ct = default);
+    Task<VendorLedgerDto> GetVendorLedgerAsync(Guid vendorId, CancellationToken ct = default);
 }
 
 public class AccountsPayableService : IAccountsPayableService
@@ -60,28 +73,41 @@ public class AccountsPayableService : IAccountsPayableService
 
     public async Task<IEnumerable<VendorDto>> GetVendorsAsync(CancellationToken ct = default)
     {
-        var list = await _db.Vendors.Where(v => !v.IsDeleted).OrderBy(v => v.VendorNumber).ToListAsync(ct);
-        return list.Select(ToVendorDto);
+        var vendors = await _db.Vendors.Where(v => !v.IsDeleted).OrderBy(v => v.VendorNumber).ToListAsync(ct);
+        var vendorIds = vendors.Select(v => v.Id).ToList();
+        var balances = await _db.APInvoices
+            .Where(i => vendorIds.Contains(i.VendorId) && !i.IsDeleted &&
+                        i.Status != APInvoiceStatus.Paid && i.Status != APInvoiceStatus.Voided)
+            .GroupBy(i => i.VendorId)
+            .Select(g => new { VendorId = g.Key, Outstanding = g.Sum(i => i.TotalAmount - i.PaidAmount - i.PrepaymentApplied) })
+            .ToDictionaryAsync(x => x.VendorId, x => x.Outstanding, ct);
+        return vendors.Select(v => ToVendorDto(v, balances.GetValueOrDefault(v.Id, 0)));
     }
 
     public async Task<VendorDto> CreateVendorAsync(CreateVendorRequest req, CancellationToken ct = default)
     {
         var count = await _db.Vendors.CountAsync(ct) + 1;
         var vendor = new Vendor(_org.OrganizationId, $"VEND-{count:D5}", req.Name, req.Email, req.Phone,
-            req.Address, req.Currency, req.PaymentTermsDays, req.TaxId);
+            req.BillingAddress, req.Currency, req.PaymentTermsDays, req.TaxId,
+            req.BillingAddress, req.ShippingAddress, req.Website, req.Notes);
         _db.Vendors.Add(vendor);
         await _db.SaveChangesAsync(ct);
-        return ToVendorDto(vendor);
+        return ToVendorDto(vendor, 0);
     }
 
     public async Task<VendorDto> UpdateVendorAsync(Guid id, UpdateVendorRequest req, CancellationToken ct = default)
     {
         var vendor = await _db.Vendors.FirstOrDefaultAsync(v => v.Id == id && !v.IsDeleted, ct)
             ?? throw new InvalidOperationException("Vendor not found.");
-        vendor.Update(req.Name, req.Email, req.Phone, req.Address,
-            req.PaymentTermsDays, req.BankAccountName, req.BankAccountNumber);
+        vendor.Update(req.Name, req.Email, req.Phone, req.BillingAddress, req.ShippingAddress,
+            req.PaymentTermsDays, req.BankAccountName, req.BankAccountNumber,
+            req.BankRoutingNumber, req.Website, req.Notes);
         await _db.SaveChangesAsync(ct);
-        return ToVendorDto(vendor);
+        var outstanding = await _db.APInvoices
+            .Where(i => i.VendorId == id && !i.IsDeleted &&
+                        i.Status != APInvoiceStatus.Paid && i.Status != APInvoiceStatus.Voided)
+            .SumAsync(i => i.TotalAmount - i.PaidAmount - i.PrepaymentApplied, ct);
+        return ToVendorDto(vendor, outstanding);
     }
 
     public async Task DeleteVendorAsync(Guid id, CancellationToken ct = default)
@@ -209,23 +235,19 @@ public class AccountsPayableService : IAccountsPayableService
         _db.PurchaseOrderReceipts.Add(receipt);
         await _db.SaveChangesAsync(ct);
 
-        return ToReceiptDto(receipt, po);
+        return ToReceiptDto(receipt);
     }
 
     public async Task<IEnumerable<ReceiptDto>> GetReceiptsAsync(Guid poId, CancellationToken ct = default)
     {
-        var po = await _db.PurchaseOrders
-            .Include(o => o.Lines)
-            .FirstOrDefaultAsync(o => o.Id == poId && !o.IsDeleted, ct)
-            ?? throw new InvalidOperationException("Purchase order not found.");
-
         var receipts = await _db.PurchaseOrderReceipts
             .Include(r => r.Lines)
+                .ThenInclude(l => l.PurchaseOrderLine)
             .Where(r => r.PurchaseOrderId == poId && !r.IsDeleted)
             .OrderByDescending(r => r.ReceivedDate)
             .ToListAsync(ct);
 
-        return receipts.Select(r => ToReceiptDto(r, po));
+        return receipts.Select(r => ToReceiptDto(r));
     }
 
     public async Task ClosePurchaseOrderAsync(Guid id, CancellationToken ct = default)
@@ -367,7 +389,7 @@ public class AccountsPayableService : IAccountsPayableService
         await _db.SaveChangesAsync(ct);
 
         return new ThreeWayMatchDto(
-            inv.Id, result.Status.ToString(),
+            inv.Id, result.MatchStatus.ToString(),
             result.ReceivedValue, result.PreviouslyInvoiced,
             result.UninvoicedReceived, result.InvoiceSubTotal,
             result.VariancePct, result.TolerancePct,
@@ -491,42 +513,220 @@ public class AccountsPayableService : IAccountsPayableService
             ?? throw new InvalidOperationException("Purchase order not found.");
     }
 
-    private static VendorDto ToVendorDto(Vendor v) => new(
-        v.Id, v.VendorNumber, v.Name, v.Email, v.Phone, v.Address,
-        v.Currency, v.PaymentTermsDays, v.TaxId,
-        v.BankAccountName, v.BankAccountNumber, v.Status.ToString(), v.CreatedAt);
+    public async Task<VendorLedgerDto> GetVendorLedgerAsync(Guid vendorId, CancellationToken ct = default)
+    {
+        var vendor = await _db.Vendors.FirstOrDefaultAsync(v => v.Id == vendorId && !v.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Vendor not found.");
 
-    private static PurchaseOrderDto ToPODto(PurchaseOrder o) => new(
-        o.Id, o.PONumber, o.VendorId, o.Vendor?.Name ?? string.Empty,
-        o.OrderDate, o.ExpectedDate, o.Description, o.Currency,
-        o.Status.ToString(), o.InvoiceStatus.ToString(),
-        o.SubTotal, o.TaxTotal, o.GrandTotal,
-        o.InvoicedAmount, o.CanReceive, o.CreatedAt,
-        o.Lines.Select(l => new PurchaseOrderLineDto(
-            l.Id, l.ProductVariantId, l.ProductCode, l.Description, l.UnitOfMeasure,
-            l.OrderedQty, l.ReceivedQty, l.UnitCost, l.TaxRate,
-            l.LineTotal, l.IsFullyReceived,
-            Math.Max(0, l.OrderedQty - l.ReceivedQty))).ToList());
+        var invoices = await _db.APInvoices
+            .Include(i => i.PurchaseOrder)
+            .Where(i => i.VendorId == vendorId && !i.IsDeleted)
+            .OrderBy(i => i.InvoiceDate)
+            .ToListAsync(ct);
 
-    private static ReceiptDto ToReceiptDto(PurchaseOrderReceipt r, PurchaseOrder po) => new(
-        r.Id, r.ReceiptNumber, r.ReceivedDate, r.Notes, r.CreatedAt,
-        r.Lines.Select(rl =>
+        var payments = await _db.APPayments
+            .Include(p => p.APInvoice)
+            .Where(p => p.VendorId == vendorId && !p.IsDeleted)
+            .OrderBy(p => p.PaymentDate)
+            .ToListAsync(ct);
+
+        var entries = new List<(DateTime Date, VendorLedgerEntryDto Dto)>();
+
+        foreach (var inv in invoices)
         {
-            var poLine = po.Lines.FirstOrDefault(l => l.Id == rl.PurchaseOrderLineId);
-            return new ReceiptLineDto(rl.Id, rl.PurchaseOrderLineId,
-                poLine?.ProductCode ?? string.Empty,
-                poLine?.Description ?? string.Empty,
-                rl.Qty);
-        }).ToList());
+            entries.Add((inv.InvoiceDate, new VendorLedgerEntryDto(
+                "Invoice", inv.InvoiceNumber, inv.InvoiceDate,
+                0, inv.TotalAmount, 0,
+                inv.Status.ToString(), inv.PurchaseOrder?.PONumber)));
+        }
+        foreach (var pay in payments)
+        {
+            entries.Add((pay.PaymentDate, new VendorLedgerEntryDto(
+                "Payment", pay.PaymentNumber, pay.PaymentDate,
+                pay.Amount, 0, 0,
+                pay.Status.ToString(), null)));
+        }
 
-    private static APInvoiceDto ToAPInvoiceDto(APInvoice i) => new(
-        i.Id, i.InvoiceNumber, i.VendorId, i.Vendor?.Name ?? string.Empty,
-        i.PurchaseOrderId, i.PurchaseOrder?.PONumber,
-        i.InvoiceDate, i.DueDate, i.Description, i.VendorInvoiceRef,
-        i.SubTotal, i.TaxAmount, i.TotalAmount,
-        i.PaidAmount, i.PrepaymentApplied, i.OutstandingAmount,
-        i.Status.ToString(), i.InvoiceType.ToString(), i.MatchStatus.ToString(),
-        i.MatchNotes, i.BypassReason,
-        i.LinkedPrepaymentInvoiceId, null,
-        i.DaysOutstanding, i.CreatedAt);
+        entries.Sort((a, b) => a.Date.CompareTo(b.Date));
+
+        decimal running = 0;
+        var finalEntries = entries.Select(e =>
+        {
+            running += e.Dto.Credit - e.Dto.Debit;
+            return e.Dto with { RunningBalance = running };
+        }).ToList();
+
+        var totalInvoiced = invoices.Sum(i => i.TotalAmount);
+        var totalPaid     = payments.Sum(p => p.Amount);
+
+        return new VendorLedgerDto(
+            vendorId, vendor.Name, vendor.VendorNumber,
+            totalInvoiced, totalPaid, totalInvoiced - totalPaid,
+            finalEntries);
+    }
+
+    // ── Vendor Addresses ──────────────────────────────────────────────────────
+
+    public async Task<IEnumerable<VendorAddressDto>> GetVendorAddressesAsync(Guid vendorId, CancellationToken ct = default)
+    {
+        var addresses = await _db.VendorAddresses
+            .Where(a => a.VendorId == vendorId && !a.IsDeleted)
+            .OrderByDescending(a => a.IsPrimary).ThenBy(a => a.Label)
+            .ToListAsync(ct);
+        return addresses.Select(ToVendorAddressDto);
+    }
+
+    public async Task<VendorAddressDto> SaveVendorAddressAsync(Guid vendorId, Guid? addressId, SaveVendorAddressRequest req, CancellationToken ct = default)
+    {
+        var vendor = await _db.Vendors.FirstOrDefaultAsync(v => v.Id == vendorId && !v.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Vendor not found.");
+
+        if (!Enum.TryParse<VendorAddressType>(req.AddressType, out var addrType))
+            addrType = VendorAddressType.Billing;
+
+        VendorAddress address;
+        if (addressId.HasValue)
+        {
+            address = await _db.VendorAddresses
+                .FirstOrDefaultAsync(a => a.Id == addressId.Value && a.VendorId == vendorId && !a.IsDeleted, ct)
+                ?? throw new InvalidOperationException("Address not found.");
+            address.Update(req.Label, addrType, req.Line1, req.Line2, req.City, req.State, req.PostalCode, req.Country ?? "US");
+        }
+        else
+        {
+            var isFirst = !await _db.VendorAddresses.AnyAsync(a => a.VendorId == vendorId && !a.IsDeleted, ct);
+            address = new VendorAddress(_org.OrganizationId, vendorId, req.Label, addrType,
+                req.Line1, req.Line2, req.City, req.State, req.PostalCode, req.Country ?? "US", isFirst);
+            _db.VendorAddresses.Add(address);
+        }
+        await _db.SaveChangesAsync(ct);
+        return ToVendorAddressDto(address);
+    }
+
+    public async Task DeleteVendorAddressAsync(Guid vendorId, Guid addressId, CancellationToken ct = default)
+    {
+        var address = await _db.VendorAddresses
+            .FirstOrDefaultAsync(a => a.Id == addressId && a.VendorId == vendorId && !a.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Address not found.");
+        address.SoftDelete();
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task SetPrimaryVendorAddressAsync(Guid vendorId, Guid addressId, CancellationToken ct = default)
+    {
+        var all = await _db.VendorAddresses
+            .Where(a => a.VendorId == vendorId && !a.IsDeleted)
+            .ToListAsync(ct);
+        foreach (var a in all) a.ClearPrimary();
+        var target = all.FirstOrDefault(a => a.Id == addressId)
+            ?? throw new InvalidOperationException("Address not found.");
+        target.SetPrimary();
+        await _db.SaveChangesAsync(ct);
+    }
+
+    // ── Vendor Contacts ───────────────────────────────────────────────────────
+
+    public async Task<IEnumerable<VendorContactDto>> GetVendorContactsAsync(Guid vendorId, CancellationToken ct = default)
+    {
+        var contacts = await _db.VendorContacts
+            .Where(c => c.VendorId == vendorId && !c.IsDeleted)
+            .OrderByDescending(c => c.IsPrimary).ThenBy(c => c.Name)
+            .ToListAsync(ct);
+        return contacts.Select(ToVendorContactDto);
+    }
+
+    public async Task<VendorContactDto> SaveVendorContactAsync(Guid vendorId, Guid? contactId, SaveVendorContactRequest req, CancellationToken ct = default)
+    {
+        var vendor = await _db.Vendors.FirstOrDefaultAsync(v => v.Id == vendorId && !v.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Vendor not found.");
+
+        VendorContact contact;
+        if (contactId.HasValue)
+        {
+            contact = await _db.VendorContacts
+                .FirstOrDefaultAsync(c => c.Id == contactId.Value && c.VendorId == vendorId && !c.IsDeleted, ct)
+                ?? throw new InvalidOperationException("Contact not found.");
+            contact.Update(req.Name, req.Title, req.Email, req.Phone, req.Mobile, req.Notes);
+        }
+        else
+        {
+            var isFirst = !await _db.VendorContacts.AnyAsync(c => c.VendorId == vendorId && !c.IsDeleted, ct);
+            contact = new VendorContact(_org.OrganizationId, vendorId, req.Name, req.Title, req.Email, req.Phone, req.Mobile, req.Notes, isFirst);
+            _db.VendorContacts.Add(contact);
+        }
+        await _db.SaveChangesAsync(ct);
+        return ToVendorContactDto(contact);
+    }
+
+    public async Task DeleteVendorContactAsync(Guid vendorId, Guid contactId, CancellationToken ct = default)
+    {
+        var contact = await _db.VendorContacts
+            .FirstOrDefaultAsync(c => c.Id == contactId && c.VendorId == vendorId && !c.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Contact not found.");
+        contact.SoftDelete();
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task SetPrimaryVendorContactAsync(Guid vendorId, Guid contactId, CancellationToken ct = default)
+    {
+        var all = await _db.VendorContacts
+            .Where(c => c.VendorId == vendorId && !c.IsDeleted)
+            .ToListAsync(ct);
+        foreach (var c in all) c.ClearPrimary();
+        var target = all.FirstOrDefault(c => c.Id == contactId)
+            ?? throw new InvalidOperationException("Contact not found.");
+        target.SetPrimary();
+        await _db.SaveChangesAsync(ct);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static VendorAddressDto ToVendorAddressDto(VendorAddress a) =>
+        new(a.Id, a.Label, a.AddressType.ToString(), a.IsPrimary,
+            a.Line1, a.Line2, a.City, a.State, a.PostalCode, a.Country, a.SingleLine);
+
+    private static VendorContactDto ToVendorContactDto(VendorContact c) =>
+        new(c.Id, c.Name, c.Title, c.Email, c.Phone, c.Mobile, c.IsPrimary, c.Notes);
+    private static VendorDto ToVendorDto(Vendor v, decimal outstanding) =>
+        new(v.Id, v.VendorNumber, v.Name,
+            v.Email, v.Phone, v.BillingAddress, v.ShippingAddress,
+            v.Website, v.Notes, v.Currency, v.PaymentTermsDays, v.TaxId,
+            v.BankAccountName, v.BankAccountNumber, v.BankRoutingNumber,
+            outstanding, v.Status.ToString(), v.CreatedAt,
+            v.Addresses?.Select(ToVendorAddressDto).ToList(),
+            v.Contacts?.Select(ToVendorContactDto).ToList());
+
+    private static PurchaseOrderDto ToPODto(PurchaseOrder o) =>
+        new(o.Id, o.PONumber, o.VendorId, o.Vendor?.Name ?? string.Empty,
+            o.OrderDate, o.ExpectedDate, o.Description, o.Currency,
+            o.Status.ToString(), o.InvoiceStatus.ToString(),
+            o.SubTotal, o.TaxTotal, o.GrandTotal, o.InvoicedAmount,
+            o.CanReceive, o.CreatedAt,
+            o.Lines.Select(l => new PurchaseOrderLineDto(
+                l.Id, l.ProductVariantId, l.ProductCode, l.Description,
+                l.UnitOfMeasure, l.OrderedQty, l.ReceivedQty,
+                l.UnitCost, l.TaxRate, l.LineTotal,
+                l.IsFullyReceived, l.OutstandingQty)).ToList());
+
+    private static ReceiptDto ToReceiptDto(PurchaseOrderReceipt r) =>
+        new(r.Id, r.ReceiptNumber, r.ReceivedDate, r.Notes, r.CreatedAt,
+            r.Lines.Select(l => new ReceiptLineDto(
+                l.Id, l.PurchaseOrderLineId,
+                l.PurchaseOrderLine?.ProductCode ?? string.Empty,
+                l.PurchaseOrderLine?.Description ?? string.Empty,
+                l.Qty)).ToList());
+
+    private static APInvoiceDto ToAPInvoiceDto(APInvoice i) =>
+        new(i.Id, i.InvoiceNumber, i.VendorId, i.Vendor?.Name ?? string.Empty,
+            i.PurchaseOrderId, i.PurchaseOrder?.PONumber,
+            i.InvoiceDate, i.DueDate, i.Description, i.VendorInvoiceRef,
+            i.SubTotal, i.TaxAmount, i.TotalAmount,
+            i.PaidAmount, i.PrepaymentApplied,
+            i.TotalAmount - i.PaidAmount - i.PrepaymentApplied,
+            i.Status.ToString(), i.InvoiceType.ToString(), i.MatchStatus.ToString(),
+            i.MatchNotes, i.BypassReason,
+            i.LinkedPrepaymentInvoiceId, i.LinkedPrepaymentInvoice?.InvoiceNumber,
+            (int)(DateTime.UtcNow - i.InvoiceDate).TotalDays, i.CreatedAt);
+
+
 }

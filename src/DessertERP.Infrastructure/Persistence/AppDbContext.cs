@@ -8,6 +8,8 @@ using DessertERP.Domain.Modules.ProductManagement;
 using DessertERP.Domain.Modules.Marketing;
 using DessertERP.Domain.Modules.Retail;
 using DessertERP.Domain.Modules.SystemAdmin;
+using DessertERP.Domain.Modules.Workflow;
+using DessertERP.Domain.Modules.Expenses;
 using Microsoft.EntityFrameworkCore;
 using PMProduct = DessertERP.Domain.Modules.ProductManagement.Product;
 
@@ -27,12 +29,24 @@ public class AppDbContext : DbContext, IAppDbContext
     // Organizations
     public DbSet<Organization> Organizations => Set<Organization>();
 
+    // Workflow Engine
+    public DbSet<WorkflowTemplate>     WorkflowTemplates     => Set<WorkflowTemplate>();
+    public DbSet<WorkflowTemplateStep> WorkflowTemplateSteps => Set<WorkflowTemplateStep>();
+    public DbSet<WorkflowInstance>     WorkflowInstances     => Set<WorkflowInstance>();
+    public DbSet<WorkflowApprovalStep> WorkflowApprovalSteps => Set<WorkflowApprovalStep>();
+
+    // Expense Management
+    public DbSet<ExpenseCategory> ExpenseCategories => Set<ExpenseCategory>();
+    public DbSet<ExpenseReport>   ExpenseReports    => Set<ExpenseReport>();
+    public DbSet<ExpenseLine>     ExpenseLines      => Set<ExpenseLine>();
+
     // Product Management
     public DbSet<Category>        Categories       => Set<Category>();
     public DbSet<Brand>           Brands           => Set<Brand>();
     public DbSet<PMProduct>       CatalogProducts  => Set<PMProduct>();
     public DbSet<ProductVariant>  ProductVariants  => Set<ProductVariant>();
-    public DbSet<InventoryRecord> InventoryRecords => Set<InventoryRecord>();
+    public DbSet<InventoryRecord>      InventoryRecords      => Set<InventoryRecord>();
+    public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
 
     // General Ledger
     public DbSet<FiscalYear>   FiscalYears   => Set<FiscalYear>();
@@ -43,14 +57,18 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<JournalLine>  JournalLines  => Set<JournalLine>();
 
     // Accounts Receivable
-    public DbSet<Customer>       Customers       => Set<Customer>();
-    public DbSet<SalesOrder>     SalesOrders     => Set<SalesOrder>();
-    public DbSet<SalesOrderLine> SalesOrderLines => Set<SalesOrderLine>();
-    public DbSet<ARInvoice>      ARInvoices      => Set<ARInvoice>();
-    public DbSet<ARPayment>      ARPayments      => Set<ARPayment>();
+    public DbSet<Customer>        Customers        => Set<Customer>();
+    public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();
+    public DbSet<CustomerContact> CustomerContacts  => Set<CustomerContact>();
+    public DbSet<SalesOrder>      SalesOrders      => Set<SalesOrder>();
+    public DbSet<SalesOrderLine>  SalesOrderLines  => Set<SalesOrderLine>();
+    public DbSet<ARInvoice>       ARInvoices       => Set<ARInvoice>();
+    public DbSet<ARPayment>       ARPayments       => Set<ARPayment>();
 
     // Accounts Payable
     public DbSet<Vendor>                    Vendors                   => Set<Vendor>();
+    public DbSet<VendorAddress>             VendorAddresses           => Set<VendorAddress>();
+    public DbSet<VendorContact>             VendorContacts            => Set<VendorContact>();
     public DbSet<PurchaseOrder>             PurchaseOrders            => Set<PurchaseOrder>();
     public DbSet<PurchaseOrderLine>         PurchaseOrderLines        => Set<PurchaseOrderLine>();
     public DbSet<PurchaseOrderReceipt>      PurchaseOrderReceipts     => Set<PurchaseOrderReceipt>();
@@ -117,6 +135,8 @@ public class AppDbContext : DbContext, IAppDbContext
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<InventoryRecord>()
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<InventoryTransaction>()
+            .HasQueryFilter(e => (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
 
         // GL
         modelBuilder.Entity<FiscalYear>()
@@ -129,6 +149,10 @@ public class AppDbContext : DbContext, IAppDbContext
         // AR
         modelBuilder.Entity<Customer>()
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<CustomerAddress>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<CustomerContact>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<SalesOrder>()
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<ARInvoice>()
@@ -138,6 +162,10 @@ public class AppDbContext : DbContext, IAppDbContext
 
         // AP
         modelBuilder.Entity<Vendor>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<VendorAddress>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<VendorContact>()
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<PurchaseOrder>()
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
@@ -188,6 +216,24 @@ public class AppDbContext : DbContext, IAppDbContext
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<Role>()
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+
+        // Workflow Engine — org-scoped, soft-delete
+        modelBuilder.Entity<WorkflowTemplate>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<WorkflowTemplateStep>()
+            .HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<WorkflowInstance>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<WorkflowApprovalStep>()
+            .HasQueryFilter(e => !e.IsDeleted);
+
+        // Expense Management — org-scoped, soft-delete
+        modelBuilder.Entity<ExpenseCategory>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<ExpenseReport>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<ExpenseLine>()
+            .HasQueryFilter(e => !e.IsDeleted);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

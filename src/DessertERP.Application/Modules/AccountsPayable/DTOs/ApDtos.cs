@@ -1,19 +1,65 @@
 namespace DessertERP.Application.Modules.AccountsPayable.DTOs;
 
+// ── Vendor Address / Contact ──────────────────────────────────────────────────
+public record VendorAddressDto(
+    Guid Id, string Label, string AddressType, bool IsPrimary,
+    string Line1, string? Line2, string City, string? State,
+    string? PostalCode, string Country, string SingleLine);
+
+public record VendorContactDto(
+    Guid Id, string Name, string? Title,
+    string? Email, string? Phone, string? Mobile,
+    bool IsPrimary, string? Notes);
+
+public record SaveVendorAddressRequest(
+    string Label, string AddressType, string Line1, string? Line2,
+    string City, string? State, string? PostalCode, string Country = "US");
+
+public record SaveVendorContactRequest(
+    string Name, string? Title, string? Email,
+    string? Phone, string? Mobile, string? Notes);
+
 // ── Vendor ────────────────────────────────────────────────────────────────────
-public record VendorDto(Guid Id, string VendorNumber, string Name,
-    string? Email, string? Phone, string? Address,
+public record VendorDto(
+    Guid Id, string VendorNumber, string Name,
+    string? Email, string? Phone,
+    string? BillingAddress, string? ShippingAddress,
+    string? Website, string? Notes,
     string Currency, int PaymentTermsDays, string? TaxId,
-    string? BankAccountName, string? BankAccountNumber, string Status, DateTime CreatedAt);
+    string? BankAccountName, string? BankAccountNumber, string? BankRoutingNumber,
+    // Balance snapshot
+    decimal OutstandingPayable,
+    string Status, DateTime CreatedAt,
+    IReadOnlyList<VendorAddressDto>? Addresses = null,
+    IReadOnlyList<VendorContactDto>? Contacts = null);
 
 public record CreateVendorRequest(
     string Name, string? Email = null, string? Phone = null,
-    string? Address = null, string Currency = "USD",
-    int PaymentTermsDays = 30, string? TaxId = null);
+    string? BillingAddress = null, string? ShippingAddress = null,
+    string Currency = "USD", int PaymentTermsDays = 30, string? TaxId = null,
+    string? Website = null, string? Notes = null);
 
 public record UpdateVendorRequest(
-    string Name, string? Email, string? Phone, string? Address,
-    int PaymentTermsDays, string? BankAccountName, string? BankAccountNumber);
+    string Name, string? Email, string? Phone,
+    string? BillingAddress, string? ShippingAddress,
+    int PaymentTermsDays, string? BankAccountName, string? BankAccountNumber,
+    string? BankRoutingNumber = null, string? Website = null, string? Notes = null);
+
+// ── Vendor Ledger ─────────────────────────────────────────────────────────────
+public record VendorLedgerEntryDto(
+    string EntryType,          // "Invoice" or "Payment"
+    string Reference,          // invoice/payment number
+    DateTime Date,
+    decimal Debit,             // payment amount (money out)
+    decimal Credit,            // invoice total (liability)
+    decimal RunningBalance,
+    string Status,
+    string? PONumber);
+
+public record VendorLedgerDto(
+    Guid VendorId, string VendorName, string VendorNumber,
+    decimal TotalInvoiced, decimal TotalPaid, decimal OutstandingPayable,
+    IReadOnlyList<VendorLedgerEntryDto> Entries);
 
 // ── Purchase Order ────────────────────────────────────────────────────────────
 public record PurchaseOrderLineDto(

@@ -59,8 +59,9 @@ public class APInvoice : BaseEntity
     public Guid? JournalEntryId { get; private set; }
 
     // ── Navigations ───────────────────────────────────────────────────────────
-    public Vendor?        Vendor        { get; private set; }
-    public PurchaseOrder? PurchaseOrder { get; private set; }
+    public Vendor?        Vendor                  { get; private set; }
+    public PurchaseOrder? PurchaseOrder           { get; private set; }
+    public APInvoice?     LinkedPrepaymentInvoice { get; private set; }
 
     // ── Computed ──────────────────────────────────────────────────────────────
     public decimal OutstandingAmount =>
@@ -172,100 +173,76 @@ public class APInvoice : BaseEntity
         SetUpdated();
     }
 
-    // ── Prepayment ────────────────────────────────────────────────────────────
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Links a prepayment invoice and deducts its amount from this invoice's outstanding balance.
+    /// Approves the invoice for payment scheduling.
+    /// Standard invoices require either a Matched or Bypassed 3WM status.
+    /// Prepayment invoices bypass 3WM entirely.
+    /// </summary>
+    public void Approve()
+    {
+        if (Status != APInvoiceStatus.Draft)
+            throw new InvalidOperationException("Only a Draft invoice can be approved.");
+
+        if (InvoiceType == APInvoiceType.Standard &&
+            MatchStatus != ThreeWayMatchStatus.Matched &&
+            MatchStatus != ThreeWayMatchStatus.Bypassed &&
+            MatchStatus != ThreeWayMatchStatus.NotMatched)   // standalone invoices (no PO) skip 3WM
+            throw new InvalidOperationException(
+                $"Invoice cannot be approved — 3-way match status is {MatchStatus}. " +
+                "Run the match or have a manager bypass the exception first.");
+
+        Status = APInvoiceStatus.Approved;
+        SetUpdated();
+    }
+
+    /// <summary>Voids the invoice. Only Draft or Approved invoices can be voided.</summary>
+    public void Void()
+    {
+        if (Status == APInvoiceStatus.Paid)
+            throw new InvalidOperationException("A fully-paid invoice cannot be voided.");
+        if (Status == APInvoiceStatus.Voided)
+            throw new InvalidOperationException("Invoice is already voided.");
+        Status = APInvoiceStatus.Voided;
+        SetUpdated();
+    }
+
+    /// <summary>Records a payment against this invoice, updating PaidAmount and status.</summary>
+    public void ApplyPayment(decimal amount)
+    {
+        if (amount <= 0)
+            throw new InvalidOperationException("Payment amount must be positive.");
+        if (Status == APInvoiceStatus.Voided)
+            throw new InvalidOperationException("Cannot apply payment to a voided invoice.");
+
+        PaidAmount += amount;
+        if (PaidAmount + PrepaymentApplied >= TotalAmount - 0.01m)
+            Status = APInvoiceStatus.Paid;
+        SetUpdated();
+    }
+
+    /// <summary>
+    /// Links a prepayment invoice and offsets its amount against this final invoice.
     /// </summary>
     public void ApplyPrepayment(APInvoice prepaymentInvoice)
     {
         if (InvoiceType == APInvoiceType.Prepayment)
             throw new InvalidOperationException("Cannot apply a prepayment to another prepayment invoice.");
         if (prepaymentInvoice.InvoiceType != APInvoiceType.Prepayment)
-            throw new InvalidOperationException("The linked invoice is not a prepayment invoice.");
+            throw new InvalidOperationException("The supplied invoice is not a prepayment invoice.");
         if (prepaymentInvoice.Status == APInvoiceStatus.Voided)
             throw new InvalidOperationException("Cannot apply a voided prepayment.");
-        if (prepaymentInvoice.VendorId != VendorId)
-            throw new InvalidOperationException("Prepayment must be from the same vendor.");
 
-        var applyAmt = Math.Min(prepaymentInvoice.TotalAmount, OutstandingAmount);
-        PrepaymentApplied          = applyAmt;
-        LinkedPrepaymentInvoiceId  = prepaymentInvoice.Id;
+        LinkedPrepaymentInvoiceId = prepaymentInvoice.Id;
+        PrepaymentApplied = prepaymentInvoice.TotalAmount;
         SetUpdated();
     }
 
-    // ── Workflow ──────────────────────────────────────────────────────────────
-
-    public void Approve(Guid? journalEntryId = null)
+    /// <summary>Sets the GL journal entry reference once the accounting entry is posted.</summary>
+    public void SetJournalEntry(Guid journalEntryId)
     {
-        if (Status != APInvoiceStatus.Draft)
-            throw new InvalidOperationException("Only a Draft invoice can be approved.");
-
-        // Prepayment invoices skip 3WM — they're approved before goods arrive.
-        if (InvoiceType != APInvoiceType.Prepayment && PurchaseOrderId.HasValue)
-        {
-            if (MatchStatus == ThreeWayMatchStatus.NotMatched)
-                throw new InvalidOperationException(
-                    "Three-way match has not been run. Run the match before approving.");
-            if (MatchStatus is ThreeWayMatchStatus.QtyException
-                           or ThreeWayMatchStatus.PriceException
-                           or ThreeWayMatchStatus.FullException)
-                throw new InvalidOperationException(
-                    "Three-way match has exceptions. A manager must bypass the match before approving.");
-        }
-
-        Status         = APInvoiceStatus.Approved;
         JournalEntryId = journalEntryId;
         SetUpdated();
     }
-
-    public void SchedulePayment()
-    {
-        if (Status != APInvoiceStatus.Approved)
-            throw new InvalidOperationException("Invoice must be approved before scheduling payment.");
-        Status = APInvoiceStatus.Scheduled;
-        SetUpdated();
-    }
-
-    public void ApplyPayment(decimal amount)
-    {
-        if (amount <= 0)
-            throw new InvalidOperationException("Payment amount must be positive.");
-        if (amount > OutstandingAmount)
-            throw new InvalidOperationException("Payment exceeds outstanding balance.");
-
-        PaidAmount += amount;
-        if (PaidAmount + PrepaymentApplied >= TotalAmount)
-            Status = APInvoiceStatus.Paid;
-        SetUpdated();
-    }
-
-    public void MarkOverdue()
-    {
-        if (Status is APInvoiceStatus.Approved or APInvoiceStatus.Scheduled)
-        {
-            Status = APInvoiceStatus.Overdue;
-            SetUpdated();
-        }
-    }
-
-    public void Void()
-    {
-        if (Status == APInvoiceStatus.Paid)
-            throw new InvalidOperationException("Cannot void a fully paid invoice.");
-        Status = APInvoiceStatus.Voided;
-        SetUpdated();
-    }
 }
-
-/// <summary>Returned from RunThreeWayMatch — not persisted, used by service layer.</summary>
-public record ThreeWayMatchResult(
-    ThreeWayMatchStatus Status,
-    decimal ReceivedValue,
-    decimal PreviouslyInvoiced,
-    decimal UninvoicedReceived,
-    decimal InvoiceSubTotal,
-    decimal VariancePct,
-    decimal TolerancePct,
-    bool QtyException,
-    bool PriceException);

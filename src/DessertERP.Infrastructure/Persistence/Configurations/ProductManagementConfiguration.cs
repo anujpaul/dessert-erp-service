@@ -112,13 +112,40 @@ public class InventoryRecordConfiguration : IEntityTypeConfiguration<InventoryRe
         b.Property(e => e.OrganizationId).IsRequired();
         b.Property(e => e.QuantityOnHand).HasColumnType("numeric(18,4)");
         b.Property(e => e.QuantityReserved).HasColumnType("numeric(18,4)");
+        b.Property(e => e.QuantityOnOrder).HasColumnType("numeric(18,4)");
         b.Property(e => e.ReorderPoint).HasColumnType("numeric(18,4)");
         b.Property(e => e.MinimumStock).HasColumnType("numeric(18,4)");
         b.Property(e => e.MaximumStock).HasColumnType("numeric(18,4)");
+        b.Property(e => e.AverageCost).HasColumnType("numeric(18,4)");
         b.Property(e => e.Location).HasMaxLength(50);
-        // Computed
+        // Computed — not persisted
         b.Ignore(e => e.QuantityAvailable);
+        b.Ignore(e => e.QuantityProjected);
         b.Ignore(e => e.NeedsReorder);
+        b.Ignore(e => e.IsOutOfStock);
+        b.Ignore(e => e.StockValue);
         b.HasQueryFilter(e => !e.IsDeleted);
+    }
+}
+
+public class InventoryTransactionConfiguration : IEntityTypeConfiguration<InventoryTransaction>
+{
+    public void Configure(EntityTypeBuilder<InventoryTransaction> b)
+    {
+        b.ToTable("inventory_transactions");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.OrganizationId).IsRequired();
+        b.Property(e => e.ProductVariantId).IsRequired();
+        b.Property(e => e.TransactionType).HasConversion<string>().HasMaxLength(40);
+        b.Property(e => e.Quantity).HasColumnType("numeric(18,4)");
+        b.Property(e => e.UnitCost).HasColumnType("numeric(18,4)");
+        b.Property(e => e.BalanceAfter).HasColumnType("numeric(18,4)");
+        b.Property(e => e.ReferenceNumber).HasMaxLength(100);
+        b.Property(e => e.Notes).HasMaxLength(500);
+        b.Property(e => e.CreatedBy).HasMaxLength(200);
+        b.HasOne(e => e.ProductVariant).WithMany()
+            .HasForeignKey(e => e.ProductVariantId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(e => new { e.OrganizationId, e.ProductVariantId, e.TransactionDate });
+        // Transactions are permanent — no soft-delete filter needed
     }
 }

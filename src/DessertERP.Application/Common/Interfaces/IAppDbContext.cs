@@ -7,6 +7,8 @@ using DessertERP.Domain.Modules.ProductManagement;
 using DessertERP.Domain.Modules.Marketing;
 using DessertERP.Domain.Modules.Retail;
 using DessertERP.Domain.Modules.SystemAdmin;
+using DessertERP.Domain.Modules.Workflow;
+using DessertERP.Domain.Modules.Expenses;
 using Microsoft.EntityFrameworkCore;
 
 namespace DessertERP.Application.Common.Interfaces;
@@ -16,12 +18,24 @@ public interface IAppDbContext
     // Organizations
     DbSet<Organization> Organizations { get; }
 
+    // Workflow Engine
+    DbSet<WorkflowTemplate>     WorkflowTemplates     { get; }
+    DbSet<WorkflowTemplateStep> WorkflowTemplateSteps { get; }
+    DbSet<WorkflowInstance>     WorkflowInstances     { get; }
+    DbSet<WorkflowApprovalStep> WorkflowApprovalSteps { get; }
+
+    // Expense Management
+    DbSet<ExpenseCategory> ExpenseCategories { get; }
+    DbSet<ExpenseReport>   ExpenseReports    { get; }
+    DbSet<ExpenseLine>     ExpenseLines      { get; }
+
     // Product Management
     DbSet<Category>        Categories       { get; }
     DbSet<Brand>           Brands           { get; }
     DbSet<Domain.Modules.ProductManagement.Product> CatalogProducts { get; }
     DbSet<ProductVariant>  ProductVariants  { get; }
-    DbSet<InventoryRecord> InventoryRecords { get; }
+    DbSet<InventoryRecord>      InventoryRecords      { get; }
+    DbSet<InventoryTransaction> InventoryTransactions { get; }
 
     // General Ledger
     DbSet<FiscalYear>    FiscalYears    { get; }
@@ -32,27 +46,31 @@ public interface IAppDbContext
     DbSet<JournalLine>   JournalLines   { get; }
 
     // Accounts Receivable
-    DbSet<Customer>       Customers       { get; }
-    DbSet<SalesOrder>     SalesOrders     { get; }
-    DbSet<SalesOrderLine> SalesOrderLines { get; }
-    DbSet<ARInvoice>      ARInvoices      { get; }
-    DbSet<ARPayment>      ARPayments      { get; }
+    DbSet<Customer>        Customers         { get; }
+    DbSet<CustomerAddress> CustomerAddresses { get; }
+    DbSet<CustomerContact> CustomerContacts  { get; }
+    DbSet<SalesOrder>      SalesOrders       { get; }
+    DbSet<SalesOrderLine>  SalesOrderLines   { get; }
+    DbSet<ARInvoice>       ARInvoices        { get; }
+    DbSet<ARPayment>       ARPayments        { get; }
 
     // Accounts Payable
-    DbSet<Vendor>                   Vendors                    { get; }
-    DbSet<PurchaseOrder>            PurchaseOrders             { get; }
-    DbSet<PurchaseOrderLine>        PurchaseOrderLines         { get; }
-    DbSet<PurchaseOrderReceipt>     PurchaseOrderReceipts      { get; }
-    DbSet<PurchaseOrderReceiptLine> PurchaseOrderReceiptLines  { get; }
-    DbSet<APInvoice>                APInvoices                 { get; }
-    DbSet<APPayment>                APPayments                 { get; }
+    DbSet<Vendor>                   Vendors                   { get; }
+    DbSet<VendorAddress>            VendorAddresses           { get; }
+    DbSet<VendorContact>            VendorContacts            { get; }
+    DbSet<PurchaseOrder>            PurchaseOrders            { get; }
+    DbSet<PurchaseOrderLine>        PurchaseOrderLines        { get; }
+    DbSet<PurchaseOrderReceipt>     PurchaseOrderReceipts     { get; }
+    DbSet<PurchaseOrderReceiptLine> PurchaseOrderReceiptLines { get; }
+    DbSet<APInvoice>                APInvoices                { get; }
+    DbSet<APPayment>                APPayments                { get; }
 
     // System Admin
-    DbSet<AppUser>       AppUsers   { get; }
-    DbSet<Role>          Roles      { get; }
+    DbSet<AppUser>        AppUsers        { get; }
+    DbSet<Role>           Roles           { get; }
     DbSet<RolePermission> RolePermissions { get; }
-    DbSet<UserRole>      UserRoles  { get; }
-    DbSet<AuditLogEntry> AuditLogs  { get; }
+    DbSet<UserRole>       UserRoles       { get; }
+    DbSet<AuditLogEntry>  AuditLogs       { get; }
 
     // Data Management
     DbSet<ImportJob>      ImportJobs      { get; }
@@ -70,9 +88,9 @@ public interface IAppDbContext
     DbSet<CouponRedemption>   CouponRedemptions   { get; }
 
     // Marketing
-    DbSet<Campaign>                Campaigns              { get; }
-    DbSet<LoyaltyProgram>          LoyaltyPrograms        { get; }
-    DbSet<CustomerLoyaltyAccount>  CustomerLoyaltyAccounts { get; }
+    DbSet<Campaign>               Campaigns               { get; }
+    DbSet<LoyaltyProgram>         LoyaltyPrograms         { get; }
+    DbSet<CustomerLoyaltyAccount> CustomerLoyaltyAccounts { get; }
 
     // Trade / Price Agreements
     DbSet<PriceAgreement> PriceAgreements { get; }

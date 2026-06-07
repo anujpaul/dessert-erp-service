@@ -11,6 +11,8 @@ public interface IAccountsReceivableService
     // Customers
     Task<IEnumerable<CustomerDto>> GetCustomersAsync(CancellationToken ct = default);
     Task<CustomerDto> CreateCustomerAsync(CreateCustomerRequest req, CancellationToken ct = default);
+    Task<CustomerDto> UpdateCustomerAsync(Guid id, UpdateCustomerRequest req, CancellationToken ct = default);
+    Task<CustomerLedgerDto> GetCustomerLedgerAsync(Guid customerId, CancellationToken ct = default);
 
     // Sales Orders
     Task<IEnumerable<SalesOrderSummaryDto>> GetSalesOrdersAsync(string? status = null, Guid? customerId = null, CancellationToken ct = default);
@@ -35,6 +37,18 @@ public interface IAccountsReceivableService
     Task<IEnumerable<ARPaymentDto>> GetPaymentsAsync(Guid? customerId = null, CancellationToken ct = default);
     Task<ARPaymentDto> CreatePaymentAsync(CreateARPaymentRequest req, CancellationToken ct = default);
 
+    // Customer Addresses
+    Task<IEnumerable<CustomerAddressDto>> GetCustomerAddressesAsync(Guid customerId, CancellationToken ct = default);
+    Task<CustomerAddressDto> SaveCustomerAddressAsync(Guid customerId, Guid? addressId, SaveCustomerAddressRequest req, CancellationToken ct = default);
+    Task DeleteCustomerAddressAsync(Guid customerId, Guid addressId, CancellationToken ct = default);
+    Task SetPrimaryCustomerAddressAsync(Guid customerId, Guid addressId, CancellationToken ct = default);
+
+    // Customer Contacts
+    Task<IEnumerable<CustomerContactDto>> GetCustomerContactsAsync(Guid customerId, CancellationToken ct = default);
+    Task<CustomerContactDto> SaveCustomerContactAsync(Guid customerId, Guid? contactId, SaveCustomerContactRequest req, CancellationToken ct = default);
+    Task DeleteCustomerContactAsync(Guid customerId, Guid contactId, CancellationToken ct = default);
+    Task SetPrimaryCustomerContactAsync(Guid customerId, Guid contactId, CancellationToken ct = default);
+
     // Reports
     Task<IEnumerable<ARAgingDto>> GetAgingReportAsync(CancellationToken ct = default);
 }
@@ -54,18 +68,94 @@ public class AccountsReceivableService : IAccountsReceivableService
 
     public async Task<IEnumerable<CustomerDto>> GetCustomersAsync(CancellationToken ct = default)
     {
-        var list = await _db.Customers.Where(c => !c.IsDeleted).OrderBy(c => c.CustomerNumber).ToListAsync(ct);
-        return list.Select(ToCustomerDto);
+        var customers = await _db.Customers.Where(c => !c.IsDeleted).OrderBy(c => c.CustomerNumber).ToListAsync(ct);
+        // load outstanding balances in one query
+        var customerIds = customers.Select(c => c.Id).ToList();
+        var balances = await _db.ARInvoices
+            .Where(i => customerIds.Contains(i.CustomerId) && !i.IsDeleted &&
+                        i.Status != ARInvoiceStatus.FullyPaid && i.Status != ARInvoiceStatus.Voided)
+            .GroupBy(i => i.CustomerId)
+            .Select(g => new { CustomerId = g.Key, Outstanding = g.Sum(i => i.TotalAmount - i.PaidAmount) })
+            .ToDictionaryAsync(x => x.CustomerId, x => x.Outstanding, ct);
+        return customers.Select(c => ToCustomerDto(c, balances.GetValueOrDefault(c.Id, 0)));
     }
 
     public async Task<CustomerDto> CreateCustomerAsync(CreateCustomerRequest req, CancellationToken ct = default)
     {
         var count = await _db.Customers.CountAsync(ct) + 1;
         var customer = new Customer(_org.OrganizationId, $"CUST-{count:D5}", req.Name, req.Email, req.Phone,
-            req.Address, req.Currency, req.PaymentTermsDays, req.CreditLimit);
+            req.BillingAddress, req.Currency, req.PaymentTermsDays, req.CreditLimit,
+            req.BillingAddress, req.ShippingAddress, req.Website, req.Notes);
         _db.Customers.Add(customer);
         await _db.SaveChangesAsync(ct);
-        return ToCustomerDto(customer);
+        return ToCustomerDto(customer, 0);
+    }
+
+    public async Task<CustomerDto> UpdateCustomerAsync(Guid id, UpdateCustomerRequest req, CancellationToken ct = default)
+    {
+        var customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Customer not found.");
+        customer.Update(req.Name, req.Email, req.Phone, req.BillingAddress, req.ShippingAddress,
+            req.PaymentTermsDays, req.CreditLimit, req.Website, req.Notes);
+        await _db.SaveChangesAsync(ct);
+        var outstanding = await _db.ARInvoices
+            .Where(i => i.CustomerId == id && !i.IsDeleted &&
+                        i.Status != ARInvoiceStatus.FullyPaid && i.Status != ARInvoiceStatus.Voided)
+            .SumAsync(i => i.TotalAmount - i.PaidAmount, ct);
+        return ToCustomerDto(customer, outstanding);
+    }
+
+    public async Task<CustomerLedgerDto> GetCustomerLedgerAsync(Guid customerId, CancellationToken ct = default)
+    {
+        var customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == customerId && !c.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Customer not found.");
+
+        var invoices = await _db.ARInvoices
+            .Include(i => i.SalesOrder)
+            .Where(i => i.CustomerId == customerId && !i.IsDeleted)
+            .OrderBy(i => i.InvoiceDate)
+            .ToListAsync(ct);
+
+        var payments = await _db.ARPayments
+            .Include(p => p.ARInvoice)
+            .Where(p => p.CustomerId == customerId && !p.IsDeleted)
+            .OrderBy(p => p.PaymentDate)
+            .ToListAsync(ct);
+
+        // Build chronological ledger entries
+        var entries = new List<(DateTime Date, CustomerLedgerEntryDto Dto)>();
+
+        foreach (var inv in invoices)
+        {
+            entries.Add((inv.InvoiceDate, new CustomerLedgerEntryDto(
+                "Invoice", inv.InvoiceNumber, inv.InvoiceDate,
+                inv.TotalAmount, 0, 0,   // RunningBalance filled below
+                inv.Status.ToString(), inv.SalesOrder?.OrderNumber)));
+        }
+        foreach (var pay in payments)
+        {
+            entries.Add((pay.PaymentDate, new CustomerLedgerEntryDto(
+                "Payment", pay.PaymentNumber, pay.PaymentDate,
+                0, pay.Amount, 0,
+                pay.Status.ToString(), null)));
+        }
+
+        entries.Sort((a, b) => a.Date.CompareTo(b.Date));
+
+        decimal running = 0;
+        var finalEntries = entries.Select(e =>
+        {
+            running += e.Dto.Debit - e.Dto.Credit;
+            return e.Dto with { RunningBalance = running };
+        }).ToList();
+
+        var totalInvoiced = invoices.Sum(i => i.TotalAmount);
+        var totalPaid     = payments.Sum(p => p.Amount);
+
+        return new CustomerLedgerDto(
+            customerId, customer.Name, customer.CustomerNumber,
+            totalInvoiced, totalPaid, totalInvoiced - totalPaid,
+            finalEntries);
     }
 
     // ── Sales Orders ──────────────────────────────────────────────────────────
@@ -344,75 +434,196 @@ public class AccountsReceivableService : IAccountsReceivableService
             created.Reference, created.Status.ToString(), created.CreatedAt);
     }
 
-    // ── Aging Report ──────────────────────────────────────────────────────────
+    // ── Customer Addresses ────────────────────────────────────────────────────
+
+    public async Task<IEnumerable<CustomerAddressDto>> GetCustomerAddressesAsync(Guid customerId, CancellationToken ct = default)
+    {
+        var addresses = await _db.CustomerAddresses
+            .Where(a => a.CustomerId == customerId && !a.IsDeleted)
+            .OrderByDescending(a => a.IsPrimary).ThenBy(a => a.Label)
+            .ToListAsync(ct);
+        return addresses.Select(ToCustomerAddressDto);
+    }
+
+    public async Task<CustomerAddressDto> SaveCustomerAddressAsync(Guid customerId, Guid? addressId, SaveCustomerAddressRequest req, CancellationToken ct = default)
+    {
+        var customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == customerId && !c.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Customer not found.");
+
+        if (!Enum.TryParse<AddressType>(req.AddressType, out var addrType))
+            addrType = AddressType.Billing;
+
+        CustomerAddress address;
+        if (addressId.HasValue)
+        {
+            address = await _db.CustomerAddresses
+                .FirstOrDefaultAsync(a => a.Id == addressId.Value && a.CustomerId == customerId && !a.IsDeleted, ct)
+                ?? throw new InvalidOperationException("Address not found.");
+            address.Update(req.Label, addrType, req.Line1, req.Line2, req.City, req.State, req.PostalCode, req.Country ?? "US");
+        }
+        else
+        {
+            // First address is automatically primary
+            var isFirst = !await _db.CustomerAddresses.AnyAsync(a => a.CustomerId == customerId && !a.IsDeleted, ct);
+            address = new CustomerAddress(_org.OrganizationId, customerId, req.Label, addrType,
+                req.Line1, req.Line2, req.City, req.State, req.PostalCode, req.Country ?? "US", isFirst);
+            _db.CustomerAddresses.Add(address);
+        }
+        await _db.SaveChangesAsync(ct);
+        return ToCustomerAddressDto(address);
+    }
+
+    public async Task DeleteCustomerAddressAsync(Guid customerId, Guid addressId, CancellationToken ct = default)
+    {
+        var address = await _db.CustomerAddresses
+            .FirstOrDefaultAsync(a => a.Id == addressId && a.CustomerId == customerId && !a.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Address not found.");
+        address.SoftDelete();
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task SetPrimaryCustomerAddressAsync(Guid customerId, Guid addressId, CancellationToken ct = default)
+    {
+        var all = await _db.CustomerAddresses
+            .Where(a => a.CustomerId == customerId && !a.IsDeleted)
+            .ToListAsync(ct);
+        foreach (var a in all) a.ClearPrimary();
+        var target = all.FirstOrDefault(a => a.Id == addressId)
+            ?? throw new InvalidOperationException("Address not found.");
+        target.SetPrimary();
+        await _db.SaveChangesAsync(ct);
+    }
+
+    // ── Customer Contacts ─────────────────────────────────────────────────────
+
+    public async Task<IEnumerable<CustomerContactDto>> GetCustomerContactsAsync(Guid customerId, CancellationToken ct = default)
+    {
+        var contacts = await _db.CustomerContacts
+            .Where(c => c.CustomerId == customerId && !c.IsDeleted)
+            .OrderByDescending(c => c.IsPrimary).ThenBy(c => c.Name)
+            .ToListAsync(ct);
+        return contacts.Select(ToCustomerContactDto);
+    }
+
+    public async Task<CustomerContactDto> SaveCustomerContactAsync(Guid customerId, Guid? contactId, SaveCustomerContactRequest req, CancellationToken ct = default)
+    {
+        var customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == customerId && !c.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Customer not found.");
+
+        CustomerContact contact;
+        if (contactId.HasValue)
+        {
+            contact = await _db.CustomerContacts
+                .FirstOrDefaultAsync(c => c.Id == contactId.Value && c.CustomerId == customerId && !c.IsDeleted, ct)
+                ?? throw new InvalidOperationException("Contact not found.");
+            contact.Update(req.Name, req.Title, req.Email, req.Phone, req.Mobile, req.Notes);
+        }
+        else
+        {
+            var isFirst = !await _db.CustomerContacts.AnyAsync(c => c.CustomerId == customerId && !c.IsDeleted, ct);
+            contact = new CustomerContact(_org.OrganizationId, customerId, req.Name, req.Title, req.Email, req.Phone, req.Mobile, req.Notes, isFirst);
+            _db.CustomerContacts.Add(contact);
+        }
+        await _db.SaveChangesAsync(ct);
+        return ToCustomerContactDto(contact);
+    }
+
+    public async Task DeleteCustomerContactAsync(Guid customerId, Guid contactId, CancellationToken ct = default)
+    {
+        var contact = await _db.CustomerContacts
+            .FirstOrDefaultAsync(c => c.Id == contactId && c.CustomerId == customerId && !c.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Contact not found.");
+        contact.SoftDelete();
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task SetPrimaryCustomerContactAsync(Guid customerId, Guid contactId, CancellationToken ct = default)
+    {
+        var all = await _db.CustomerContacts
+            .Where(c => c.CustomerId == customerId && !c.IsDeleted)
+            .ToListAsync(ct);
+        foreach (var c in all) c.ClearPrimary();
+        var target = all.FirstOrDefault(c => c.Id == contactId)
+            ?? throw new InvalidOperationException("Contact not found.");
+        target.SetPrimary();
+        await _db.SaveChangesAsync(ct);
+    }
+
+    // ── Reports ───────────────────────────────────────────────────────────────
 
     public async Task<IEnumerable<ARAgingDto>> GetAgingReportAsync(CancellationToken ct = default)
     {
+        var today = DateTime.UtcNow.Date;
         var invoices = await _db.ARInvoices
             .Include(i => i.Customer)
             .Where(i => !i.IsDeleted && i.Status != ARInvoiceStatus.FullyPaid && i.Status != ARInvoiceStatus.Voided)
             .ToListAsync(ct);
 
         return invoices
-            .GroupBy(i => new { i.CustomerId, i.Customer!.CustomerNumber, i.Customer.Name })
+            .GroupBy(i => i.CustomerId)
             .Select(g =>
             {
-                var today = DateTime.UtcNow.Date;
-                return new ARAgingDto(
-                    g.Key.CustomerNumber, g.Key.Name,
-                    g.Where(i => i.DaysOutstanding == 0).Sum(i => i.OutstandingAmount),
-                    g.Where(i => i.DaysOutstanding is > 0 and <= 30).Sum(i => i.OutstandingAmount),
-                    g.Where(i => i.DaysOutstanding is > 30 and <= 60).Sum(i => i.OutstandingAmount),
-                    g.Where(i => i.DaysOutstanding is > 60 and <= 90).Sum(i => i.OutstandingAmount),
-                    g.Where(i => i.DaysOutstanding > 90).Sum(i => i.OutstandingAmount),
-                    g.Sum(i => i.OutstandingAmount));
+                var customer = g.First().Customer!;
+                decimal current = 0, d1_30 = 0, d31_60 = 0, d61_90 = 0, over90 = 0;
+                foreach (var inv in g)
+                {
+                    var outstanding = inv.TotalAmount - inv.PaidAmount;
+                    var days = (today - inv.DueDate.Date).Days;
+                    if (days <= 0)       current += outstanding;
+                    else if (days <= 30) d1_30   += outstanding;
+                    else if (days <= 60) d31_60  += outstanding;
+                    else if (days <= 90) d61_90  += outstanding;
+                    else                 over90  += outstanding;
+                }
+                return new ARAgingDto(customer.CustomerNumber, customer.Name,
+                    current, d1_30, d31_60, d61_90, over90,
+                    current + d1_30 + d31_60 + d61_90 + over90);
             })
-            .OrderByDescending(r => r.Total);
+            .OrderBy(a => a.CustomerName);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private Task<SalesOrder> LoadOrderWithLines(Guid id, CancellationToken ct) =>
-        _db.SalesOrders.Include(o => o.Lines)
-            .FirstOrDefaultAsync(o => o.Id == id && !o.IsDeleted, ct)
-        is Task<SalesOrder?> t
-            ? t.ContinueWith(r => r.Result ?? throw new InvalidOperationException("Sales order not found."), ct)
-            : throw new InvalidOperationException("Sales order not found.");
-
-    private static CustomerDto ToCustomerDto(Customer c) => new(
-        c.Id, c.CustomerNumber, c.Name, c.Email, c.Phone, c.Address,
-        c.Currency, c.PaymentTermsDays, c.CreditLimit, c.Status.ToString(), c.CreatedAt);
-
-    private static SalesOrderDto ToSalesOrderDto(SalesOrder o)
+    private async Task<SalesOrder> LoadOrderWithLines(Guid id, CancellationToken ct)
     {
-        // Compute totals live from lines — avoids stale persisted column values
-        var lineDtos = o.Lines
-            .Where(l => !l.IsDeleted)
-            .Select(l => new SalesOrderLineDto(
-                l.Id, l.ProductVariantId, l.Sku, l.ProductName, l.VariantDescription,
-                l.UnitOfMeasure, l.Quantity, l.UnitPrice, l.DiscountPct, l.TaxRate,
-                l.LineSubTotal, l.DiscountAmount, l.TaxAmount, l.LineTotal))
-            .ToList();
-
-        var subTotal      = lineDtos.Sum(l => l.LineSubTotal);
-        var discountTotal = lineDtos.Sum(l => l.DiscountAmount);
-        var taxTotal      = lineDtos.Sum(l => l.TaxAmount);
-        var grandTotal    = lineDtos.Sum(l => l.LineTotal);
-
-        return new SalesOrderDto(
-            o.Id, o.OrderNumber, o.CustomerId, o.Customer?.Name ?? string.Empty,
-            o.OrderDate, o.RequestedShipDate, o.ActualShipDate,
-            o.Description, o.CustomerRef, o.Currency, o.Status.ToString(),
-            subTotal, taxTotal, discountTotal, grandTotal,
-            o.ARInvoiceId, o.CreatedAt, lineDtos,
-            o.IsExported, o.ExportedAt);
+        return await _db.SalesOrders
+            .Include(o => o.Lines)
+            .Include(o => o.Customer)
+            .FirstOrDefaultAsync(o => o.Id == id && !o.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Sales order not found.");
     }
 
-    private static ARInvoiceDto ToARInvoiceDto(ARInvoice i) => new(
-        i.Id, i.InvoiceNumber, i.CustomerId, i.Customer?.Name ?? string.Empty,
-        i.SalesOrderId, i.SalesOrder?.OrderNumber,
-        i.InvoiceDate, i.DueDate, i.Description,
-        i.SubTotal, i.TaxAmount, i.DiscountAmount, i.TotalAmount,
-        i.PaidAmount, i.OutstandingAmount, i.Status.ToString(),
-        i.DaysOutstanding, i.CreatedAt);
+    private static CustomerDto ToCustomerDto(Customer c, decimal outstanding) =>
+        new(c.Id, c.CustomerNumber, c.Name, c.Email, c.Phone,
+            c.BillingAddress, c.ShippingAddress, c.Website, c.Notes,
+            c.Currency, c.PaymentTermsDays, c.CreditLimit,
+            outstanding, outstanding, c.CreditLimit - outstanding,
+            c.Status.ToString(), c.CreatedAt);
+
+    private static CustomerAddressDto ToCustomerAddressDto(CustomerAddress a) =>
+        new(a.Id, a.Label, a.AddressType.ToString(), a.IsPrimary,
+            a.Line1, a.Line2, a.City, a.State, a.PostalCode, a.Country, a.SingleLine);
+
+    private static CustomerContactDto ToCustomerContactDto(CustomerContact c) =>
+        new(c.Id, c.Name, c.Title, c.Email, c.Phone, c.Mobile, c.IsPrimary, c.Notes);
+
+    private static ARInvoiceDto ToARInvoiceDto(ARInvoice i) =>
+        new(i.Id, i.InvoiceNumber, i.CustomerId, i.Customer?.Name ?? string.Empty,
+            i.SalesOrderId, i.SalesOrder?.OrderNumber,
+            i.InvoiceDate, i.DueDate, i.Description,
+            i.SubTotal, i.TaxAmount, i.DiscountAmount, i.TotalAmount,
+            i.PaidAmount, i.OutstandingAmount, i.Status.ToString(),
+            i.DaysOutstanding, i.CreatedAt);
+
+    private static SalesOrderDto ToSalesOrderDto(SalesOrder o) =>
+        new(o.Id, o.OrderNumber, o.CustomerId, o.Customer?.Name ?? string.Empty,
+            o.OrderDate, o.RequestedShipDate, o.ActualShipDate,
+            o.Description, o.CustomerRef, o.Currency, o.Status.ToString(),
+            o.SubTotal, o.TaxTotal, o.DiscountTotal, o.GrandTotal,
+            o.ARInvoiceId, o.CreatedAt,
+            o.Lines.Select(l => new SalesOrderLineDto(
+                l.Id, l.ProductVariantId, l.Sku, l.ProductName, l.VariantDescription,
+                l.UnitOfMeasure, l.Quantity, l.UnitPrice, l.DiscountPct, l.TaxRate,
+                l.LineSubTotal, l.DiscountAmount, l.TaxAmount, l.LineTotal)).ToList(),
+            o.IsExported, o.ExportedAt);
 }

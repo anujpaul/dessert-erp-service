@@ -11,6 +11,9 @@ using DessertERP.Application.Modules.DataManagement.Services;
 using DessertERP.Application.Modules.GeneralLedger.Services;
 using DessertERP.Application.Modules.Organization.Services;
 using DessertERP.Application.Modules.ProductManagement.Services;
+using DessertERP.Application.Modules.InventoryManagement.Services;
+using DessertERP.Application.Modules.Workflow.Services;
+using DessertERP.Application.Modules.Expenses.Services;
 using DessertERP.Application.Modules.Marketing.Services;
 using DessertERP.Application.Modules.ProductManagement.Services;
 using DessertERP.Application.Modules.Retail.Services;
@@ -60,6 +63,9 @@ builder.Services.AddScoped<IGeneralLedgerService, GeneralLedgerService>();
 builder.Services.AddScoped<IAccountsReceivableService, AccountsReceivableService>();
 builder.Services.AddScoped<IAccountsPayableService, AccountsPayableService>();
 builder.Services.AddScoped<IProductManagementService, ProductManagementService>();
+builder.Services.AddScoped<IInventoryManagementService, InventoryManagementService>();
+builder.Services.AddScoped<IWorkflowService, WorkflowService>();
+builder.Services.AddScoped<IExpenseService, ExpenseService>();
 
 // ── Data Management ───────────────────────────────────────────────────────────
 builder.Services.AddScoped<IDataManagementService, DataManagementService>();

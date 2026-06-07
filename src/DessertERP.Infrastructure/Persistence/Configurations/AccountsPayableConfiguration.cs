@@ -16,10 +16,15 @@ public class VendorConfiguration : IEntityTypeConfiguration<Vendor>
         b.Property(e => e.Email).HasMaxLength(200);
         b.Property(e => e.Phone).HasMaxLength(50);
         b.Property(e => e.Address).HasMaxLength(500);
+        b.Property(e => e.BillingAddress).HasMaxLength(500);
+        b.Property(e => e.ShippingAddress).HasMaxLength(500);
+        b.Property(e => e.Website).HasMaxLength(200);
+        b.Property(e => e.Notes).HasMaxLength(1000);
         b.Property(e => e.Currency).HasMaxLength(3);
         b.Property(e => e.TaxId).HasMaxLength(50);
         b.Property(e => e.BankAccountName).HasMaxLength(200);
         b.Property(e => e.BankAccountNumber).HasMaxLength(50);
+        b.Property(e => e.BankRoutingNumber).HasMaxLength(50);
         b.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
         b.HasIndex(e => new { e.OrganizationId, e.VendorNumber }).IsUnique();
         // Query filter applied in AppDbContext.OnModelCreating
@@ -153,5 +158,46 @@ public class APPaymentConfiguration : IEntityTypeConfiguration<APPayment>
         b.HasOne(e => e.Vendor).WithMany().HasForeignKey(e => e.VendorId);
         b.HasOne(e => e.APInvoice).WithMany().HasForeignKey(e => e.APInvoiceId);
         // Query filter applied in AppDbContext.OnModelCreating
+    }
+}
+
+public class VendorAddressConfiguration : IEntityTypeConfiguration<VendorAddress>
+{
+    public void Configure(EntityTypeBuilder<VendorAddress> b)
+    {
+        b.ToTable("vendor_addresses");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.OrganizationId).IsRequired();
+        b.Property(e => e.Label).HasMaxLength(100).IsRequired();
+        b.Property(e => e.AddressType).HasConversion<string>().HasMaxLength(20);
+        b.Property(e => e.Line1).HasMaxLength(300).IsRequired();
+        b.Property(e => e.Line2).HasMaxLength(300);
+        b.Property(e => e.City).HasMaxLength(100).IsRequired();
+        b.Property(e => e.State).HasMaxLength(100);
+        b.Property(e => e.PostalCode).HasMaxLength(20);
+        b.Property(e => e.Country).HasMaxLength(100);
+        b.Ignore(e => e.SingleLine);
+        b.HasOne(e => e.Vendor).WithMany(v => v.Addresses)
+            .HasForeignKey(e => e.VendorId).OnDelete(DeleteBehavior.Cascade);
+        b.HasQueryFilter(e => !e.IsDeleted);
+    }
+}
+
+public class VendorContactConfiguration : IEntityTypeConfiguration<VendorContact>
+{
+    public void Configure(EntityTypeBuilder<VendorContact> b)
+    {
+        b.ToTable("vendor_contacts");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.OrganizationId).IsRequired();
+        b.Property(e => e.Name).HasMaxLength(200).IsRequired();
+        b.Property(e => e.Title).HasMaxLength(150);
+        b.Property(e => e.Email).HasMaxLength(200);
+        b.Property(e => e.Phone).HasMaxLength(50);
+        b.Property(e => e.Mobile).HasMaxLength(50);
+        b.Property(e => e.Notes).HasMaxLength(500);
+        b.HasOne(e => e.Vendor).WithMany(v => v.Contacts)
+            .HasForeignKey(e => e.VendorId).OnDelete(DeleteBehavior.Cascade);
+        b.HasQueryFilter(e => !e.IsDeleted);
     }
 }

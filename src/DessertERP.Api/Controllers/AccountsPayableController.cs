@@ -127,6 +127,38 @@ public class AccountsPayableController : ControllerBase
         catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
     }
 
+    /// <summary>Raise a prepayment / advance-payment invoice against a PO before goods arrive.</summary>
+    [HttpPost("invoices/prepayment")]
+    public async Task<IActionResult> CreatePrepayment([FromBody] CreatePrepaymentInvoiceRequest req, CancellationToken ct)
+    {
+        try { return StatusCode(201, await _svc.CreatePrepaymentInvoiceAsync(req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    /// <summary>Run three-way match (PO → GRN → Invoice). Returns match result and updates MatchStatus.</summary>
+    [HttpPost("invoices/{id:guid}/match")]
+    public async Task<IActionResult> RunMatch(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.RunThreeWayMatchAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    /// <summary>Manager bypass: override a match exception with a documented reason.</summary>
+    [HttpPost("invoices/{id:guid}/bypass-match")]
+    public async Task<IActionResult> BypassMatch(Guid id, [FromBody] BypassMatchRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.BypassMatchAsync(id, req.Reason, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    /// <summary>Apply a prepayment invoice to reduce the outstanding balance on this final invoice.</summary>
+    [HttpPost("invoices/{id:guid}/apply-prepayment/{prepaymentId:guid}")]
+    public async Task<IActionResult> ApplyPrepayment(Guid id, Guid prepaymentId, CancellationToken ct)
+    {
+        try { return Ok(await _svc.ApplyPrepaymentAsync(id, prepaymentId, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
     [HttpPost("invoices/{id:guid}/approve")]
     public async Task<IActionResult> Approve(Guid id, CancellationToken ct)
     {

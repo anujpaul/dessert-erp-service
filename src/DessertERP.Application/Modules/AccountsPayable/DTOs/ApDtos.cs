@@ -63,17 +63,37 @@ public record ReceiptDto(Guid Id, string ReceiptNumber, DateTime ReceivedDate,
     string? Notes, DateTime CreatedAt, IReadOnlyList<ReceiptLineDto> Lines);
 
 // ── AP Invoice ────────────────────────────────────────────────────────────────
-public record APInvoiceDto(Guid Id, string InvoiceNumber, Guid VendorId,
-    string VendorName, Guid? PurchaseOrderId, string? PONumber,
-    DateTime InvoiceDate, DateTime DueDate, string Description,
-    string VendorInvoiceRef, decimal SubTotal, decimal TaxAmount,
-    decimal TotalAmount, decimal PaidAmount, decimal OutstandingAmount,
-    string Status, int DaysOutstanding, DateTime CreatedAt);
+public record APInvoiceDto(
+    Guid Id, string InvoiceNumber, Guid VendorId, string VendorName,
+    Guid? PurchaseOrderId, string? PONumber,
+    DateTime InvoiceDate, DateTime DueDate, string Description, string VendorInvoiceRef,
+    decimal SubTotal, decimal TaxAmount, decimal TotalAmount,
+    decimal PaidAmount, decimal PrepaymentApplied, decimal OutstandingAmount,
+    string Status, string InvoiceType, string MatchStatus,
+    string? MatchNotes, string? BypassReason,
+    Guid? LinkedPrepaymentInvoiceId, string? LinkedPrepaymentNumber,
+    int DaysOutstanding, DateTime CreatedAt);
 
 public record CreateAPInvoiceRequest(
     Guid VendorId, DateTime InvoiceDate, DateTime DueDate,
     string Description, string VendorInvoiceRef,
     decimal SubTotal, decimal TaxAmount, Guid? PurchaseOrderId = null);
+
+public record CreatePrepaymentInvoiceRequest(
+    Guid VendorId, Guid PurchaseOrderId,
+    string VendorInvoiceRef, DateTime InvoiceDate, DateTime DueDate,
+    decimal Amount, decimal TaxAmount = 0, string? Description = null);
+
+public record ThreeWayMatchDto(
+    Guid InvoiceId, string MatchStatus,
+    decimal ReceivedValue, decimal PreviouslyInvoiced,
+    decimal UninvoicedReceived, decimal InvoiceSubTotal,
+    decimal VariancePct, decimal TolerancePct,
+    bool QtyException, bool PriceException);
+
+public record BypassMatchRequest(string Reason);
+
+public record ApplyPrepaymentRequest(Guid PrepaymentInvoiceId);
 
 // ── AP Payment ────────────────────────────────────────────────────────────────
 public record APPaymentDto(Guid Id, string PaymentNumber, Guid VendorId,

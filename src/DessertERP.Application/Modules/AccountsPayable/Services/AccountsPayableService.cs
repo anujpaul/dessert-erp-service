@@ -30,6 +30,10 @@ public interface IAccountsPayableService
     Task<IEnumerable<APInvoiceDto>> GetInvoicesAsync(Guid? vendorId = null, CancellationToken ct = default);
     Task<APInvoiceDto> CreateInvoiceAsync(CreateAPInvoiceRequest req, CancellationToken ct = default);
     Task<APInvoiceDto> GenerateInvoiceFromPOAsync(Guid poId, string vendorInvoiceRef, CancellationToken ct = default);
+    Task<APInvoiceDto> CreatePrepaymentInvoiceAsync(CreatePrepaymentInvoiceRequest req, CancellationToken ct = default);
+    Task<ThreeWayMatchDto> RunThreeWayMatchAsync(Guid invoiceId, CancellationToken ct = default);
+    Task<APInvoiceDto> BypassMatchAsync(Guid invoiceId, string reason, CancellationToken ct = default);
+    Task<APInvoiceDto> ApplyPrepaymentAsync(Guid invoiceId, Guid prepaymentInvoiceId, CancellationToken ct = default);
     Task ApproveInvoiceAsync(Guid id, CancellationToken ct = default);
     Task VoidInvoiceAsync(Guid id, CancellationToken ct = default);
 
@@ -52,7 +56,7 @@ public class AccountsPayableService : IAccountsPayableService
         _org = org;
     }
 
-    // ── Vendors ───────────────────────────────────────────────────────────────
+    // Vendors
 
     public async Task<IEnumerable<VendorDto>> GetVendorsAsync(CancellationToken ct = default)
     {
@@ -84,7 +88,6 @@ public class AccountsPayableService : IAccountsPayableService
     {
         var vendor = await _db.Vendors.FirstOrDefaultAsync(v => v.Id == id && !v.IsDeleted, ct)
             ?? throw new InvalidOperationException("Vendor not found.");
-        // Check if used in any open PO
         var hasOpenPO = await _db.PurchaseOrders
             .AnyAsync(p => p.VendorId == id && !p.IsDeleted &&
                 p.Status != PurchaseOrderStatus.Closed && p.Status != PurchaseOrderStatus.Cancelled, ct);
@@ -94,7 +97,7 @@ public class AccountsPayableService : IAccountsPayableService
         await _db.SaveChangesAsync(ct);
     }
 
-    // ── Purchase Orders ───────────────────────────────────────────────────────
+    // Purchase Orders
 
     public async Task<IEnumerable<PurchaseOrderSummaryDto>> GetPurchaseOrdersAsync(
         string? status = null, Guid? vendorId = null, CancellationToken ct = default)
@@ -139,7 +142,6 @@ public class AccountsPayableService : IAccountsPayableService
             .FirstOrDefaultAsync(o => o.Id == poId && !o.IsDeleted, ct)
             ?? throw new InvalidOperationException("Purchase order not found.");
 
-        // Validate the variant exists
         var variantExists = await _db.ProductVariants
             .IgnoreQueryFilters()
             .AnyAsync(v => v.Id == req.ProductVariantId && !v.IsDeleted, ct);
@@ -148,15 +150,13 @@ public class AccountsPayableService : IAccountsPayableService
 
         var line = po.AddLine(req.ProductVariantId, req.ProductCode, req.Description,
             req.UnitOfMeasure, req.Quantity, req.UnitCost, req.TaxRate);
-        _db.PurchaseOrderLines.Add(line);   // explicit tracking — avoids concurrency exception
+        _db.PurchaseOrderLines.Add(line);
         await _db.SaveChangesAsync(ct);
         return (await GetPurchaseOrderAsync(poId, ct))!;
     }
 
     public async Task RemovePOLineAsync(Guid poId, Guid lineId, CancellationToken ct = default)
     {
-        // Load PO without Include, then load the specific line directly from DbSet.
-        // This avoids EF collection-tracking issues caused by global query filters on PurchaseOrderLine.
         var po = await _db.PurchaseOrders
             .FirstOrDefaultAsync(o => o.Id == poId && !o.IsDeleted, ct)
             ?? throw new InvalidOperationException("Purchase order not found.");
@@ -165,11 +165,9 @@ public class AccountsPayableService : IAccountsPayableService
             .FirstOrDefaultAsync(l => l.Id == lineId && l.PurchaseOrderId == poId && !l.IsDeleted, ct)
             ?? throw new InvalidOperationException("Line not found.");
 
-        // Validate via domain (status check)
         po.ValidateCanRemoveLine();
         line.SoftDelete();
 
-        // Recalc PO totals from remaining active lines
         var remaining = await _db.PurchaseOrderLines
             .Where(l => l.PurchaseOrderId == poId && !l.IsDeleted && l.Id != lineId)
             .ToListAsync(ct);
@@ -190,7 +188,7 @@ public class AccountsPayableService : IAccountsPayableService
         var po = await LoadPOWithLines(poId, ct);
 
         if (!po.CanReceive)
-            throw new InvalidOperationException("This PO cannot receive more goods — it is either fully received, closed, or cancelled.");
+            throw new InvalidOperationException("This PO cannot receive more goods.");
 
         var count = await _db.PurchaseOrderReceipts.CountAsync(ct) + 1;
         var receiptDate = req.ReceivedDate?.Date ?? DateTime.UtcNow.Date;
@@ -203,7 +201,7 @@ public class AccountsPayableService : IAccountsPayableService
             if (lineReq.Qty <= 0) continue;
             var poLine = po.Lines.FirstOrDefault(l => l.Id == lineReq.LineId)
                 ?? throw new InvalidOperationException($"PO line {lineReq.LineId} not found.");
-            poLine.Receive(lineReq.Qty);          // validates qty + updates ReceivedQty
+            poLine.Receive(lineReq.Qty);
             receipt.AddLine(poLine.Id, lineReq.Qty);
         }
 
@@ -244,7 +242,7 @@ public class AccountsPayableService : IAccountsPayableService
         await _db.SaveChangesAsync(ct);
     }
 
-    // ── AP Invoices ───────────────────────────────────────────────────────────
+    // AP Invoices
 
     public async Task<IEnumerable<APInvoiceDto>> GetInvoicesAsync(Guid? vendorId = null, CancellationToken ct = default)
     {
@@ -283,11 +281,10 @@ public class AccountsPayableService : IAccountsPayableService
         if (po.Status == PurchaseOrderStatus.Cancelled)
             throw new InvalidOperationException("Cannot invoice a cancelled PO.");
         if (po.InvoiceStatus == POInvoiceStatus.FullyInvoiced)
-            throw new InvalidOperationException("All received goods have already been invoiced. Receive more goods before generating another invoice.");
+            throw new InvalidOperationException("All received goods have already been invoiced.");
 
-        // Invoice only the received value not yet invoiced (supports partial invoicing)
-        var receivedValue = po.Lines.Sum(l => Math.Round(l.ReceivedQty * l.UnitCost, 4));
-        var receivedTax   = po.Lines.Sum(l => Math.Round(l.ReceivedQty * l.UnitCost * l.TaxRate / 100, 4));
+        var receivedValue      = po.Lines.Sum(l => Math.Round(l.ReceivedQty * l.UnitCost, 4));
+        var receivedTax        = po.Lines.Sum(l => Math.Round(l.ReceivedQty * l.UnitCost * l.TaxRate / 100, 4));
         var uninvoicedSubTotal = receivedValue - po.InvoicedAmount;
         var invoiceSubTotal    = Math.Round(uninvoicedSubTotal / (1 + (receivedTax > 0 && receivedValue > 0 ? receivedTax / receivedValue : 0)), 4);
         var invoiceTax         = Math.Round(uninvoicedSubTotal - invoiceSubTotal, 4);
@@ -299,19 +296,111 @@ public class AccountsPayableService : IAccountsPayableService
         var dueDate = DateTime.UtcNow.Date.AddDays(vendor.PaymentTermsDays);
         var count   = await _db.APInvoices.CountAsync(ct) + 1;
 
+        var previouslyInvoiced = po.InvoicedAmount; // before recording this invoice
+
         var inv = new APInvoice(_org.OrganizationId, $"APINV-{count:D6}", po.VendorId,
             DateTime.UtcNow.Date, dueDate,
             $"Invoice for {po.PONumber} (received goods)", vendorInvoiceRef,
             invoiceSubTotal, invoiceTax, po.Id);
 
         _db.APInvoices.Add(inv);
-        po.RecordInvoice(uninvoicedSubTotal);   // updates InvoiceStatus; does NOT change receive Status
+        po.RecordInvoice(uninvoicedSubTotal);
+
+        // Auto-run three-way match
+        inv.RunThreeWayMatch(receivedValue, previouslyInvoiced, tolerancePct: 2m);
+
         await _db.SaveChangesAsync(ct);
 
         var created = await _db.APInvoices
             .Include(i => i.Vendor).Include(i => i.PurchaseOrder)
             .FirstAsync(i => i.Id == inv.Id, ct);
         return ToAPInvoiceDto(created);
+    }
+
+    public async Task<APInvoiceDto> CreatePrepaymentInvoiceAsync(
+        CreatePrepaymentInvoiceRequest req, CancellationToken ct = default)
+    {
+        var po = await _db.PurchaseOrders
+            .Include(o => o.Vendor)
+            .FirstOrDefaultAsync(o => o.Id == req.PurchaseOrderId && !o.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Purchase order not found.");
+
+        if (po.Status == PurchaseOrderStatus.Cancelled)
+            throw new InvalidOperationException("Cannot raise a prepayment against a cancelled PO.");
+
+        var count = await _db.APInvoices.CountAsync(ct) + 1;
+        var inv = new APInvoice(
+            _org.OrganizationId, $"PREPAY-{count:D6}", po.VendorId,
+            req.InvoiceDate, req.DueDate,
+            req.Description ?? $"Prepayment for {po.PONumber}",
+            req.VendorInvoiceRef,
+            req.Amount, req.TaxAmount, po.Id,
+            APInvoiceType.Prepayment);
+
+        _db.APInvoices.Add(inv);
+        await _db.SaveChangesAsync(ct);
+
+        var created = await _db.APInvoices
+            .Include(i => i.Vendor).Include(i => i.PurchaseOrder)
+            .FirstAsync(i => i.Id == inv.Id, ct);
+        return ToAPInvoiceDto(created);
+    }
+
+    public async Task<ThreeWayMatchDto> RunThreeWayMatchAsync(Guid invoiceId, CancellationToken ct = default)
+    {
+        var inv = await _db.APInvoices
+            .FirstOrDefaultAsync(i => i.Id == invoiceId && !i.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Invoice not found.");
+
+        if (!inv.PurchaseOrderId.HasValue)
+            throw new InvalidOperationException("Three-way match requires a PO-linked invoice.");
+
+        var po = await _db.PurchaseOrders
+            .Include(o => o.Lines)
+            .FirstOrDefaultAsync(o => o.Id == inv.PurchaseOrderId.Value && !o.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Purchase order not found.");
+
+        var receivedValue      = po.Lines.Sum(l => Math.Round(l.ReceivedQty * l.UnitCost, 4));
+        var previouslyInvoiced = po.InvoicedAmount - inv.SubTotal; // exclude this invoice
+
+        var result = inv.RunThreeWayMatch(receivedValue, previouslyInvoiced, tolerancePct: 2m);
+        await _db.SaveChangesAsync(ct);
+
+        return new ThreeWayMatchDto(
+            inv.Id, result.Status.ToString(),
+            result.ReceivedValue, result.PreviouslyInvoiced,
+            result.UninvoicedReceived, result.InvoiceSubTotal,
+            result.VariancePct, result.TolerancePct,
+            result.QtyException, result.PriceException);
+    }
+
+    public async Task<APInvoiceDto> BypassMatchAsync(Guid invoiceId, string reason, CancellationToken ct = default)
+    {
+        var inv = await _db.APInvoices
+            .Include(i => i.Vendor).Include(i => i.PurchaseOrder)
+            .FirstOrDefaultAsync(i => i.Id == invoiceId && !i.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Invoice not found.");
+
+        inv.BypassMatch(reason);
+        await _db.SaveChangesAsync(ct);
+        return ToAPInvoiceDto(inv);
+    }
+
+    public async Task<APInvoiceDto> ApplyPrepaymentAsync(
+        Guid invoiceId, Guid prepaymentInvoiceId, CancellationToken ct = default)
+    {
+        var inv = await _db.APInvoices
+            .Include(i => i.Vendor).Include(i => i.PurchaseOrder)
+            .FirstOrDefaultAsync(i => i.Id == invoiceId && !i.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Invoice not found.");
+
+        var prepay = await _db.APInvoices
+            .FirstOrDefaultAsync(i => i.Id == prepaymentInvoiceId && !i.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Prepayment invoice not found.");
+
+        inv.ApplyPrepayment(prepay);
+        await _db.SaveChangesAsync(ct);
+        return ToAPInvoiceDto(inv);
     }
 
     public async Task ApproveInvoiceAsync(Guid id, CancellationToken ct = default)
@@ -330,7 +419,7 @@ public class AccountsPayableService : IAccountsPayableService
         await _db.SaveChangesAsync(ct);
     }
 
-    // ── AP Payments ───────────────────────────────────────────────────────────
+    // AP Payments
 
     public async Task<IEnumerable<APPaymentDto>> GetPaymentsAsync(Guid? vendorId = null, CancellationToken ct = default)
     {
@@ -371,7 +460,7 @@ public class AccountsPayableService : IAccountsPayableService
             created.Reference, created.Status.ToString(), created.CreatedAt);
     }
 
-    // ── AP Aging Report ───────────────────────────────────────────────────────
+    // AP Aging Report
 
     public async Task<IEnumerable<APAgingDto>> GetAgingReportAsync(CancellationToken ct = default)
     {
@@ -393,7 +482,7 @@ public class AccountsPayableService : IAccountsPayableService
             .OrderByDescending(r => r.Total);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // Helpers
 
     private async Task<PurchaseOrder> LoadPOWithLines(Guid id, CancellationToken ct)
     {
@@ -434,6 +523,10 @@ public class AccountsPayableService : IAccountsPayableService
         i.Id, i.InvoiceNumber, i.VendorId, i.Vendor?.Name ?? string.Empty,
         i.PurchaseOrderId, i.PurchaseOrder?.PONumber,
         i.InvoiceDate, i.DueDate, i.Description, i.VendorInvoiceRef,
-        i.SubTotal, i.TaxAmount, i.TotalAmount, i.PaidAmount,
-        i.OutstandingAmount, i.Status.ToString(), i.DaysOutstanding, i.CreatedAt);
+        i.SubTotal, i.TaxAmount, i.TotalAmount,
+        i.PaidAmount, i.PrepaymentApplied, i.OutstandingAmount,
+        i.Status.ToString(), i.InvoiceType.ToString(), i.MatchStatus.ToString(),
+        i.MatchNotes, i.BypassReason,
+        i.LinkedPrepaymentInvoiceId, null,
+        i.DaysOutstanding, i.CreatedAt);
 }

@@ -123,7 +123,12 @@ public class APInvoiceConfiguration : IEntityTypeConfiguration<APInvoice>
         b.Property(e => e.TaxAmount).HasColumnType("numeric(18,4)");
         b.Property(e => e.TotalAmount).HasColumnType("numeric(18,4)");
         b.Property(e => e.PaidAmount).HasColumnType("numeric(18,4)");
+        b.Property(e => e.PrepaymentApplied).HasColumnType("numeric(18,4)");
         b.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+        b.Property(e => e.InvoiceType).HasConversion<string>().HasMaxLength(20);
+        b.Property(e => e.MatchStatus).HasConversion<string>().HasMaxLength(30);
+        b.Property(e => e.MatchNotes).HasMaxLength(2000);
+        b.Property(e => e.BypassReason).HasMaxLength(500);
         b.Ignore(e => e.OutstandingAmount);
         b.Ignore(e => e.DaysOutstanding);
         b.HasOne(e => e.Vendor).WithMany().HasForeignKey(e => e.VendorId);

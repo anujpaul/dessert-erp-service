@@ -10,6 +10,8 @@ using DessertERP.Domain.Modules.Retail;
 using DessertERP.Domain.Modules.SystemAdmin;
 using DessertERP.Domain.Modules.Workflow;
 using DessertERP.Domain.Modules.Expenses;
+using DessertERP.Domain.Modules.CashBank;
+using DessertERP.Domain.Modules.FixedAssets;
 using DessertERP.Domain.Modules.WarehouseManagement;
 using Microsoft.EntityFrameworkCore;
 using PMProduct = DessertERP.Domain.Modules.ProductManagement.Product;
@@ -110,6 +112,20 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<ImportJobRow>   ImportJobRows   => Set<ImportJobRow>();
     public DbSet<ExportJobRow>   ExportJobRows   => Set<ExportJobRow>();
     public DbSet<BatchJobConfig> BatchJobConfigs => Set<BatchJobConfig>();
+
+    // Cash & Bank Management
+    public DbSet<BankAccount>        BankAccounts        => Set<BankAccount>();
+    public DbSet<BankTransaction>    BankTransactions    => Set<BankTransaction>();
+    public DbSet<BankReconciliation> BankReconciliations => Set<BankReconciliation>();
+    public DbSet<CashJournal>        CashJournals        => Set<CashJournal>();
+    public DbSet<CashJournalLine>    CashJournalLines    => Set<CashJournalLine>();
+
+    // Fixed Assets
+    public DbSet<FixedAsset>        FixedAssets        => Set<FixedAsset>();
+    public DbSet<AssetDepreciation> AssetDepreciations => Set<AssetDepreciation>();
+    public DbSet<AssetDisposal>     AssetDisposals     => Set<AssetDisposal>();
+    public DbSet<AssetTransfer>     AssetTransfers     => Set<AssetTransfer>();
+    public DbSet<AssetMaintenance>  AssetMaintenances  => Set<AssetMaintenance>();
 
     // Warehouse Management
     public DbSet<Warehouse>         Warehouses         => Set<Warehouse>();
@@ -282,6 +298,28 @@ public class AppDbContext : DbContext, IAppDbContext
             .HasQueryFilter(e => _orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId);
         modelBuilder.Entity<TransferOrder>()
             .HasQueryFilter(e => _orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId);
+
+        // Cash & Bank Management — org-scoped, soft-delete
+        modelBuilder.Entity<BankAccount>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<BankTransaction>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<BankReconciliation>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<CashJournal>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<CashJournalLine>()
+            .HasQueryFilter(e => !e.IsDeleted);
+
+        // Fixed Assets — org-scoped (no soft-delete, disposals are status-based)
+        modelBuilder.Entity<FixedAsset>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<AssetDisposal>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<AssetTransfer>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<AssetMaintenance>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

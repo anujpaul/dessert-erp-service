@@ -1,5 +1,7 @@
 using DessertERP.Domain.Modules.AccountsPayable;
 using DessertERP.Domain.Modules.AccountsReceivable;
+using DessertERP.Domain.Modules.CashBank;
+using DessertERP.Domain.Modules.FixedAssets;
 using DessertERP.Domain.Modules.DataManagement;
 using DessertERP.Domain.Modules.GeneralLedger;
 using DessertERP.Domain.Modules.Organization;
@@ -108,6 +110,20 @@ public interface IAppDbContext
 
     // Trade / Price Agreements
     DbSet<PriceAgreement> PriceAgreements { get; }
+
+    // Cash & Bank Management
+    DbSet<BankAccount>       BankAccounts       { get; }
+    DbSet<BankTransaction>   BankTransactions   { get; }
+    DbSet<BankReconciliation> BankReconciliations { get; }
+    DbSet<CashJournal>       CashJournals       { get; }
+    DbSet<CashJournalLine>   CashJournalLines   { get; }
+
+    // Fixed Assets
+    DbSet<FixedAsset>        FixedAssets        { get; }
+    DbSet<AssetDepreciation> AssetDepreciations { get; }
+    DbSet<AssetDisposal>     AssetDisposals     { get; }
+    DbSet<AssetTransfer>     AssetTransfers     { get; }
+    DbSet<AssetMaintenance>  AssetMaintenances  { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

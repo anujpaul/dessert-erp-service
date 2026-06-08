@@ -266,4 +266,208 @@ public class AccountsPayableController : ControllerBase
         try { await _svc.SetPrimaryVendorContactAsync(vendorId, contactId, ct); return NoContent(); }
         catch (InvalidOperationException ex) { return NotFound(new { error = ex.Message }); }
     }
+
+    // ── PO Workflow ───────────────────────────────────────────────────────────
+
+    [HttpPost("purchase-orders/{id:guid}/submit-for-approval")]
+    public async Task<IActionResult> SubmitPOForApproval(Guid id, [FromBody] SubmitForApprovalRequest req, CancellationToken ct)
+    {
+        try { await _svc.SubmitPOForApprovalAsync(id, req.SubmittedBy, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("purchase-orders/workflow/{workflowInstanceId:guid}/approved")]
+    public async Task<IActionResult> POWorkflowApproved(Guid workflowInstanceId, CancellationToken ct)
+    {
+        try { await _svc.POWorkflowApprovedAsync(workflowInstanceId, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("purchase-orders/workflow/{workflowInstanceId:guid}/rejected")]
+    public async Task<IActionResult> POWorkflowRejected(Guid workflowInstanceId, [FromBody] WorkflowOutcomeRequest req, CancellationToken ct)
+    {
+        try { await _svc.POWorkflowRejectedAsync(workflowInstanceId, req.Reason ?? string.Empty, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    // ── Invoice Workflow ──────────────────────────────────────────────────────
+
+    [HttpPost("invoices/{id:guid}/submit-for-approval")]
+    public async Task<IActionResult> SubmitInvoiceForApproval(Guid id, [FromBody] SubmitForApprovalRequest req, CancellationToken ct)
+    {
+        try { await _svc.SubmitInvoiceForApprovalAsync(id, req.SubmittedBy, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("invoices/workflow/{workflowInstanceId:guid}/approved")]
+    public async Task<IActionResult> InvoiceWorkflowApproved(Guid workflowInstanceId, CancellationToken ct)
+    {
+        try { await _svc.InvoiceWorkflowApprovedAsync(workflowInstanceId, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("invoices/workflow/{workflowInstanceId:guid}/rejected")]
+    public async Task<IActionResult> InvoiceWorkflowRejected(Guid workflowInstanceId, CancellationToken ct)
+    {
+        try { await _svc.InvoiceWorkflowRejectedAsync(workflowInstanceId, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    // ── Purchase Requisitions ─────────────────────────────────────────────────
+
+    [HttpGet("requisitions")]
+    public async Task<IActionResult> GetRequisitions([FromQuery] string? status, CancellationToken ct)
+        => Ok(await _svc.GetRequisitionsAsync(status, ct));
+
+    [HttpGet("requisitions/{id:guid}")]
+    public async Task<IActionResult> GetRequisition(Guid id, CancellationToken ct)
+    {
+        var pr = await _svc.GetRequisitionAsync(id, ct);
+        return pr is null ? NotFound() : Ok(pr);
+    }
+
+    [HttpPost("requisitions")]
+    public async Task<IActionResult> CreateRequisition([FromBody] CreatePRRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.CreateRequisitionAsync(req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("requisitions/{id:guid}/lines")]
+    public async Task<IActionResult> AddPRLine(Guid id, [FromBody] AddPRLineRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.AddPRLineAsync(id, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpDelete("requisitions/{id:guid}/lines/{lineId:guid}")]
+    public async Task<IActionResult> RemovePRLine(Guid id, Guid lineId, CancellationToken ct)
+    {
+        try { await _svc.RemovePRLineAsync(id, lineId, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("requisitions/{id:guid}/submit")]
+    public async Task<IActionResult> SubmitRequisition(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.SubmitRequisitionAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("requisitions/{id:guid}/approve")]
+    public async Task<IActionResult> ApproveRequisition(Guid id, [FromBody] SubmitForApprovalRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.ApproveRequisitionAsync(id, req.SubmittedBy, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("requisitions/{id:guid}/reject")]
+    public async Task<IActionResult> RejectRequisition(Guid id, [FromBody] WorkflowOutcomeRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.RejectRequisitionAsync(id, "system", req.Reason ?? string.Empty, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("requisitions/{id:guid}/convert-to-po")]
+    public async Task<IActionResult> ConvertRequisitionToPO(Guid id, [FromBody] ConvertPRToPORequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.ConvertRequisitionToPOAsync(id, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("requisitions/{id:guid}/cancel")]
+    public async Task<IActionResult> CancelRequisition(Guid id, CancellationToken ct)
+    {
+        try { await _svc.CancelRequisitionAsync(id, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    // ── Payment Proposals ─────────────────────────────────────────────────────
+
+    [HttpGet("payment-proposals")]
+    public async Task<IActionResult> GetPaymentProposals(CancellationToken ct)
+        => Ok(await _svc.GetPaymentProposalsAsync(ct));
+
+    [HttpGet("payment-proposals/{id:guid}")]
+    public async Task<IActionResult> GetPaymentProposal(Guid id, CancellationToken ct)
+    {
+        var p = await _svc.GetPaymentProposalAsync(id, ct);
+        return p is null ? NotFound() : Ok(p);
+    }
+
+    [HttpPost("payment-proposals")]
+    public async Task<IActionResult> CreatePaymentProposal([FromBody] CreatePaymentProposalRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.CreatePaymentProposalAsync(req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("payment-proposals/{id:guid}/lines/{invoiceId:guid}")]
+    public async Task<IActionResult> AddProposalLine(Guid id, Guid invoiceId, CancellationToken ct)
+    {
+        try { return Ok(await _svc.AddProposalLineAsync(id, invoiceId, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpDelete("payment-proposals/{id:guid}/lines/{lineId:guid}")]
+    public async Task<IActionResult> RemoveProposalLine(Guid id, Guid lineId, CancellationToken ct)
+    {
+        try { await _svc.RemoveProposalLineAsync(id, lineId, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("payment-proposals/{id:guid}/approve")]
+    public async Task<IActionResult> ApprovePaymentProposal(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.ApprovePaymentProposalAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("payment-proposals/{id:guid}/process")]
+    public async Task<IActionResult> ProcessPaymentProposal(Guid id, [FromBody] SubmitForApprovalRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.ProcessPaymentProposalAsync(id, req.SubmittedBy, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("payment-proposals/{id:guid}/cancel")]
+    public async Task<IActionResult> CancelPaymentProposal(Guid id, CancellationToken ct)
+    {
+        try { await _svc.CancelPaymentProposalAsync(id, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    // ── Vendor Credit Notes ───────────────────────────────────────────────────
+
+    [HttpGet("credit-notes")]
+    public async Task<IActionResult> GetCreditNotes([FromQuery] Guid? vendorId, CancellationToken ct)
+        => Ok(await _svc.GetCreditNotesAsync(vendorId, ct));
+
+    [HttpPost("credit-notes")]
+    public async Task<IActionResult> CreateCreditNote([FromBody] CreateCreditNoteRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.CreateCreditNoteAsync(req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("credit-notes/{id:guid}/post")]
+    public async Task<IActionResult> PostCreditNote(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.PostCreditNoteAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("credit-notes/{id:guid}/apply/{invoiceId:guid}")]
+    public async Task<IActionResult> ApplyCreditNote(Guid id, Guid invoiceId, [FromQuery] decimal amount, CancellationToken ct)
+    {
+        try { return Ok(await _svc.ApplyCreditNoteAsync(id, invoiceId, amount, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("credit-notes/{id:guid}/void")]
+    public async Task<IActionResult> VoidCreditNote(Guid id, CancellationToken ct)
+    {
+        try { await _svc.VoidCreditNoteAsync(id, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
 }

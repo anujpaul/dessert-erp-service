@@ -2,6 +2,7 @@ using DessertERP.Application.Common.Interfaces;
 using DessertERP.Application.Modules.AccountsReceivable.DTOs;
 using DessertERP.Domain.Modules.AccountsReceivable;
 using DessertERP.Domain.Modules.ProductManagement;
+using DessertERP.Domain.Modules.Workflow;
 using Microsoft.EntityFrameworkCore;
 
 namespace DessertERP.Application.Modules.AccountsReceivable.Services;
@@ -51,6 +52,49 @@ public interface IAccountsReceivableService
 
     // Reports
     Task<IEnumerable<ARAgingDto>> GetAgingReportAsync(CancellationToken ct = default);
+
+    // ── Sales Quotations ──────────────────────────────────────────────────────
+    Task<IEnumerable<QuotationSummaryDto>> GetQuotationsAsync(string? status = null, Guid? customerId = null, CancellationToken ct = default);
+    Task<QuotationDto?> GetQuotationAsync(Guid id, CancellationToken ct = default);
+    Task<QuotationDto> CreateQuotationAsync(CreateQuotationRequest req, CancellationToken ct = default);
+    Task<QuotationDto> AddQuotationLineAsync(Guid quotationId, AddQuotationLineRequest req, CancellationToken ct = default);
+    Task RemoveQuotationLineAsync(Guid quotationId, Guid lineId, CancellationToken ct = default);
+    Task<QuotationDto> SubmitQuotationForApprovalAsync(Guid id, string submittedBy, CancellationToken ct = default);
+    Task<QuotationDto> ApproveQuotationAsync(Guid id, CancellationToken ct = default);
+    Task<QuotationDto> RejectQuotationAsync(Guid id, string reason, CancellationToken ct = default);
+    Task<QuotationDto> SendQuotationAsync(Guid id, CancellationToken ct = default);
+    Task<QuotationDto> AcceptQuotationAsync(Guid id, CancellationToken ct = default);
+    Task<QuotationDto> RejectByCustomerAsync(Guid id, string? reason, CancellationToken ct = default);
+    Task<SalesOrderDto> ConvertQuotationToSOAsync(Guid quotationId, ConvertQuotationToSORequest req, CancellationToken ct = default);
+    Task CancelQuotationAsync(Guid id, CancellationToken ct = default);
+
+    // ── SO Workflow ───────────────────────────────────────────────────────────
+    Task<SalesOrderDto> SubmitSOForApprovalAsync(Guid id, string submittedBy, CancellationToken ct = default);
+    Task<SalesOrderDto> ApproveSOAsync(Guid id, CancellationToken ct = default);
+    Task<SalesOrderDto> RejectSOAsync(Guid id, string reason, CancellationToken ct = default);
+    Task<SalesOrderDto> ConfirmDeliveryAsync(Guid id, ConfirmDeliveryRequest req, CancellationToken ct = default);
+
+    // ── AR Invoice Workflow ───────────────────────────────────────────────────
+    Task<ARInvoiceDto> SubmitARInvoiceForApprovalAsync(Guid id, string submittedBy, CancellationToken ct = default);
+    Task<ARInvoiceDto> ApproveARInvoiceAsync(Guid id, CancellationToken ct = default);
+    Task<ARInvoiceDto> RejectARInvoiceAsync(Guid id, CancellationToken ct = default);
+
+    // ── AR Credit Notes ───────────────────────────────────────────────────────
+    Task<IEnumerable<ARCreditNoteSummaryDto>> GetARCreditNotesAsync(Guid? customerId = null, CancellationToken ct = default);
+    Task<ARCreditNoteDto?> GetARCreditNoteAsync(Guid id, CancellationToken ct = default);
+    Task<ARCreditNoteDto> CreateARCreditNoteAsync(CreateARCreditNoteRequest req, CancellationToken ct = default);
+    Task<ARCreditNoteDto> SubmitCreditNoteForApprovalAsync(Guid id, string submittedBy, CancellationToken ct = default);
+    Task<ARCreditNoteDto> ApproveCreditNoteAsync(Guid id, CancellationToken ct = default);
+    Task<ARCreditNoteDto> RejectCreditNoteAsync(Guid id, CancellationToken ct = default);
+    Task<ARCreditNoteDto> IssueCreditNoteAsync(Guid id, CancellationToken ct = default);
+    Task<ARCreditNoteDto> ApplyCreditToInvoiceAsync(Guid id, ApplyCreditNoteRequest req, CancellationToken ct = default);
+    Task<ARCreditNoteDto> VoidCreditNoteAsync(Guid id, CancellationToken ct = default);
+
+    // ── Dunning / Collections ─────────────────────────────────────────────────
+    Task<IEnumerable<DunningRecordDto>> GetDunningRecordsAsync(Guid? customerId = null, CancellationToken ct = default);
+    Task<DunningRecordDto> CreateDunningAsync(CreateDunningRequest req, CancellationToken ct = default);
+    Task<DunningRecordDto> ResolveDunningAsync(Guid id, string? notes, CancellationToken ct = default);
+    Task<DunningRecordDto> EscalateDunningAsync(Guid id, CancellationToken ct = default);
 }
 
 public class AccountsReceivableService : IAccountsReceivableService
@@ -178,7 +222,7 @@ public class AccountsReceivableService : IAccountsReceivableService
             o.Id, o.OrderNumber, o.CustomerId, o.Customer?.Name ?? string.Empty,
             o.OrderDate, o.RequestedShipDate, o.CustomerRef,
             o.Status.ToString(), o.GrandTotal, o.Lines.Count, o.CreatedAt,
-            o.IsExported, o.ExportedAt));
+            o.IsExported, o.ExportedAt, o.WorkflowInstanceId, o.RejectionReason));
     }
 
     public async Task<SalesOrderDto?> GetSalesOrderAsync(Guid id, CancellationToken ct = default)
@@ -613,7 +657,8 @@ public class AccountsReceivableService : IAccountsReceivableService
             i.InvoiceDate, i.DueDate, i.Description,
             i.SubTotal, i.TaxAmount, i.DiscountAmount, i.TotalAmount,
             i.PaidAmount, i.OutstandingAmount, i.Status.ToString(),
-            i.DaysOutstanding, i.CreatedAt);
+            i.DaysOutstanding, i.CreatedAt,
+            i.WorkflowInstanceId, i.IsSubmittedForApproval);
 
     private static SalesOrderDto ToSalesOrderDto(SalesOrder o) =>
         new(o.Id, o.OrderNumber, o.CustomerId, o.Customer?.Name ?? string.Empty,
@@ -625,5 +670,496 @@ public class AccountsReceivableService : IAccountsReceivableService
                 l.Id, l.ProductVariantId, l.Sku, l.ProductName, l.VariantDescription,
                 l.UnitOfMeasure, l.Quantity, l.UnitPrice, l.DiscountPct, l.TaxRate,
                 l.LineSubTotal, l.DiscountAmount, l.TaxAmount, l.LineTotal)).ToList(),
-            o.IsExported, o.ExportedAt);
+            o.IsExported, o.ExportedAt,
+            o.WorkflowInstanceId, o.RejectionReason, o.DeliveredAt, o.DeliveryReference);
+
+    // ── Sales Quotations ──────────────────────────────────────────────────────
+
+    public async Task<IEnumerable<QuotationSummaryDto>> GetQuotationsAsync(
+        string? status = null, Guid? customerId = null, CancellationToken ct = default)
+    {
+        var query = _db.SalesQuotations
+            .Include(q => q.Customer)
+            .Include(q => q.Lines)
+            .Where(q => !q.IsDeleted);
+        if (!string.IsNullOrEmpty(status) && Enum.TryParse<QuotationStatus>(status, out var s))
+            query = query.Where(q => q.Status == s);
+        if (customerId.HasValue)
+            query = query.Where(q => q.CustomerId == customerId.Value);
+        var list = await query.OrderByDescending(q => q.QuotationDate).ToListAsync(ct);
+        return list.Select(ToQuotationSummaryDto);
+    }
+
+    public async Task<QuotationDto?> GetQuotationAsync(Guid id, CancellationToken ct = default)
+    {
+        var q = await _db.SalesQuotations
+            .Include(q => q.Customer)
+            .Include(q => q.Lines)
+            .FirstOrDefaultAsync(q => q.Id == id && !q.IsDeleted, ct);
+        return q is null ? null : ToQuotationDto(q);
+    }
+
+    public async Task<QuotationDto> CreateQuotationAsync(CreateQuotationRequest req, CancellationToken ct = default)
+    {
+        var count = await _db.SalesQuotations.CountAsync(ct) + 1;
+        var q = new SalesQuotation(_org.OrganizationId, $"QUO-{req.QuotationDate:yyyy}-{count:D5}",
+            req.CustomerId, req.QuotationDate, req.ValidUntil, req.Description,
+            req.CustomerRef, req.Currency, req.Notes);
+        _db.SalesQuotations.Add(q);
+        await _db.SaveChangesAsync(ct);
+        return (await GetQuotationAsync(q.Id, ct))!;
+    }
+
+    public async Task<QuotationDto> AddQuotationLineAsync(Guid quotationId, AddQuotationLineRequest req, CancellationToken ct = default)
+    {
+        var quotation = await _db.SalesQuotations
+            .FirstOrDefaultAsync(q => q.Id == quotationId && !q.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Quotation not found.");
+
+        var variant = await _db.ProductVariants
+            .IgnoreQueryFilters()
+            .Include(v => v.Product).ThenInclude(p => p!.Category)
+            .FirstOrDefaultAsync(v => v.Id == req.ProductVariantId && !v.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Product variant not found.");
+
+        var product = variant.Product ?? throw new InvalidOperationException("Product not found.");
+        var unitPrice = req.OverrideUnitPrice ?? variant.EffectivePrice(product.BasePrice);
+        var taxRate = product.EffectiveTaxRate(product.Category?.TaxRate ?? 0m);
+        var variantDesc = string.Join(", ", new[] { variant.Size, variant.Color, variant.Material }
+            .Where(s => !string.IsNullOrWhiteSpace(s)));
+
+        var line = quotation.AddLine(variant.Id, variant.Sku, product.Name,
+            string.IsNullOrEmpty(variantDesc) ? null : variantDesc,
+            product.UnitOfMeasure, req.Quantity, unitPrice, taxRate, req.DiscountPct);
+        _db.SalesQuotationLines.Add(line);
+        await _db.SaveChangesAsync(ct);
+        return (await GetQuotationAsync(quotationId, ct))!;
+    }
+
+    public async Task RemoveQuotationLineAsync(Guid quotationId, Guid lineId, CancellationToken ct = default)
+    {
+        var quotation = await _db.SalesQuotations
+            .FirstOrDefaultAsync(q => q.Id == quotationId && !q.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Quotation not found.");
+        if (quotation.Status != QuotationStatus.Draft)
+            throw new InvalidOperationException("Lines can only be removed from a Draft quotation.");
+        var line = await _db.SalesQuotationLines
+            .FirstOrDefaultAsync(l => l.Id == lineId && l.QuotationId == quotationId && !l.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Line not found.");
+        line.SoftDelete();
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<QuotationDto> SubmitQuotationForApprovalAsync(Guid id, string submittedBy, CancellationToken ct = default)
+    {
+        var q = await _db.SalesQuotations
+            .Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Quotation not found.");
+
+        var wf = new WorkflowInstance(_org.OrganizationId, WorkflowDocumentType.SalesQuotation,
+            q.Id, q.QuotationNumber, q.GrandTotal, submittedBy);
+        wf.AddApprovalStep(1, "Quotation Approval", "SalesManager", null);
+        _db.WorkflowInstances.Add(wf);
+        await _db.SaveChangesAsync(ct);
+
+        q.SubmitForApproval(wf.Id);
+        await _db.SaveChangesAsync(ct);
+        return (await GetQuotationAsync(id, ct))!;
+    }
+
+    public async Task<QuotationDto> ApproveQuotationAsync(Guid id, CancellationToken ct = default)
+    {
+        var q = await _db.SalesQuotations
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Quotation not found.");
+        q.WorkflowApproved();
+        await _db.SaveChangesAsync(ct);
+        return (await GetQuotationAsync(id, ct))!;
+    }
+
+    public async Task<QuotationDto> RejectQuotationAsync(Guid id, string reason, CancellationToken ct = default)
+    {
+        var q = await _db.SalesQuotations
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Quotation not found.");
+        q.WorkflowRejected(reason);
+        await _db.SaveChangesAsync(ct);
+        return (await GetQuotationAsync(id, ct))!;
+    }
+
+    public async Task<QuotationDto> SendQuotationAsync(Guid id, CancellationToken ct = default)
+    {
+        var q = await _db.SalesQuotations
+            .Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Quotation not found.");
+        q.Send();
+        await _db.SaveChangesAsync(ct);
+        return (await GetQuotationAsync(id, ct))!;
+    }
+
+    public async Task<QuotationDto> AcceptQuotationAsync(Guid id, CancellationToken ct = default)
+    {
+        var q = await _db.SalesQuotations
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Quotation not found.");
+        q.Accept();
+        await _db.SaveChangesAsync(ct);
+        return (await GetQuotationAsync(id, ct))!;
+    }
+
+    public async Task<QuotationDto> RejectByCustomerAsync(Guid id, string? reason, CancellationToken ct = default)
+    {
+        var q = await _db.SalesQuotations
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Quotation not found.");
+        q.Reject(reason);
+        await _db.SaveChangesAsync(ct);
+        return (await GetQuotationAsync(id, ct))!;
+    }
+
+    public async Task<SalesOrderDto> ConvertQuotationToSOAsync(Guid quotationId, ConvertQuotationToSORequest req, CancellationToken ct = default)
+    {
+        var q = await _db.SalesQuotations
+            .Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == quotationId && !x.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Quotation not found.");
+
+        if (q.Status != QuotationStatus.Accepted)
+            throw new InvalidOperationException("Only Accepted quotations can be converted to a Sales Order.");
+
+        var orderDate = req.OrderDate ?? DateTime.UtcNow.Date;
+        var count = await _db.SalesOrders.CountAsync(ct) + 1;
+        var so = new SalesOrder(_org.OrganizationId, $"SO-{orderDate:yyyy}-{count:D5}",
+            q.CustomerId, orderDate,
+            req.Description ?? q.Description,
+            q.CustomerRef, q.Currency);
+        _db.SalesOrders.Add(so);
+        await _db.SaveChangesAsync(ct);
+
+        foreach (var ql in q.Lines)
+        {
+            var line = so.AddLine(ql.ProductVariantId, ql.Sku, ql.ProductName,
+                ql.VariantDescription, ql.UnitOfMeasure,
+                ql.Quantity, ql.UnitPrice, ql.TaxRate, ql.DiscountPct);
+            _db.SalesOrderLines.Add(line);
+        }
+
+        q.MarkConverted(so.Id);
+        await _db.SaveChangesAsync(ct);
+        return (await GetSalesOrderAsync(so.Id, ct))!;
+    }
+
+    public async Task CancelQuotationAsync(Guid id, CancellationToken ct = default)
+    {
+        var q = await _db.SalesQuotations
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Quotation not found.");
+        q.Cancel();
+        await _db.SaveChangesAsync(ct);
+    }
+
+    // ── SO Workflow ───────────────────────────────────────────────────────────
+
+    public async Task<SalesOrderDto> SubmitSOForApprovalAsync(Guid id, string submittedBy, CancellationToken ct = default)
+    {
+        var order = await _db.SalesOrders
+            .Include(o => o.Lines)
+            .FirstOrDefaultAsync(o => o.Id == id && !o.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Sales order not found.");
+
+        var wf = new WorkflowInstance(_org.OrganizationId, WorkflowDocumentType.SalesOrder,
+            order.Id, order.OrderNumber, order.GrandTotal, submittedBy);
+        wf.AddApprovalStep(1, "Sales Order Approval", "SalesManager", null);
+        _db.WorkflowInstances.Add(wf);
+        await _db.SaveChangesAsync(ct);
+
+        order.SubmitForApproval(wf.Id);
+        await _db.SaveChangesAsync(ct);
+        return (await GetSalesOrderAsync(id, ct))!;
+    }
+
+    public async Task<SalesOrderDto> ApproveSOAsync(Guid id, CancellationToken ct = default)
+    {
+        var order = await _db.SalesOrders
+            .FirstOrDefaultAsync(o => o.Id == id && !o.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Sales order not found.");
+        order.WorkflowApproved();
+        await _db.SaveChangesAsync(ct);
+        return (await GetSalesOrderAsync(id, ct))!;
+    }
+
+    public async Task<SalesOrderDto> RejectSOAsync(Guid id, string reason, CancellationToken ct = default)
+    {
+        var order = await _db.SalesOrders
+            .FirstOrDefaultAsync(o => o.Id == id && !o.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Sales order not found.");
+        order.WorkflowRejected(reason);
+        await _db.SaveChangesAsync(ct);
+        return (await GetSalesOrderAsync(id, ct))!;
+    }
+
+    public async Task<SalesOrderDto> ConfirmDeliveryAsync(Guid id, ConfirmDeliveryRequest req, CancellationToken ct = default)
+    {
+        var order = await _db.SalesOrders
+            .FirstOrDefaultAsync(o => o.Id == id && !o.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Sales order not found.");
+        order.ConfirmDelivery(req.DeliveredAt ?? DateTime.UtcNow, req.Reference);
+        await _db.SaveChangesAsync(ct);
+        return (await GetSalesOrderAsync(id, ct))!;
+    }
+
+    // ── AR Invoice Workflow ───────────────────────────────────────────────────
+
+    public async Task<ARInvoiceDto> SubmitARInvoiceForApprovalAsync(Guid id, string submittedBy, CancellationToken ct = default)
+    {
+        var inv = await _db.ARInvoices
+            .Include(i => i.Customer).Include(i => i.SalesOrder)
+            .FirstOrDefaultAsync(i => i.Id == id && !i.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Invoice not found.");
+
+        var wf = new WorkflowInstance(_org.OrganizationId, WorkflowDocumentType.ARInvoice,
+            inv.Id, inv.InvoiceNumber, inv.TotalAmount, submittedBy);
+        wf.AddApprovalStep(1, "Invoice Approval", "FinanceManager", null);
+        _db.WorkflowInstances.Add(wf);
+        await _db.SaveChangesAsync(ct);
+
+        inv.SubmitForApproval(wf.Id);
+        await _db.SaveChangesAsync(ct);
+        return ToARInvoiceDto(inv);
+    }
+
+    public async Task<ARInvoiceDto> ApproveARInvoiceAsync(Guid id, CancellationToken ct = default)
+    {
+        var inv = await _db.ARInvoices
+            .Include(i => i.Customer).Include(i => i.SalesOrder)
+            .FirstOrDefaultAsync(i => i.Id == id && !i.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Invoice not found.");
+        inv.WorkflowApproved();
+        await _db.SaveChangesAsync(ct);
+        return ToARInvoiceDto(inv);
+    }
+
+    public async Task<ARInvoiceDto> RejectARInvoiceAsync(Guid id, CancellationToken ct = default)
+    {
+        var inv = await _db.ARInvoices
+            .Include(i => i.Customer).Include(i => i.SalesOrder)
+            .FirstOrDefaultAsync(i => i.Id == id && !i.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Invoice not found.");
+        inv.WorkflowRejected();
+        await _db.SaveChangesAsync(ct);
+        return ToARInvoiceDto(inv);
+    }
+
+    // ── AR Credit Notes ───────────────────────────────────────────────────────
+
+    public async Task<IEnumerable<ARCreditNoteSummaryDto>> GetARCreditNotesAsync(
+        Guid? customerId = null, CancellationToken ct = default)
+    {
+        var query = _db.CustomerCreditNotes
+            .Include(cn => cn.Customer)
+            .Where(cn => !cn.IsDeleted);
+        if (customerId.HasValue)
+            query = query.Where(cn => cn.CustomerId == customerId.Value);
+        var list = await query.OrderByDescending(cn => cn.CreditDate).ToListAsync(ct);
+        return list.Select(cn => new ARCreditNoteSummaryDto(
+            cn.Id, cn.CreditNoteNumber, cn.CustomerId, cn.Customer?.Name ?? string.Empty,
+            cn.ARInvoiceId, cn.CreditDate, cn.Reason.ToString(),
+            cn.TotalAmount, cn.AvailableCredit, cn.Status.ToString(), cn.CreatedAt));
+    }
+
+    public async Task<ARCreditNoteDto?> GetARCreditNoteAsync(Guid id, CancellationToken ct = default)
+    {
+        var cn = await _db.CustomerCreditNotes
+            .Include(x => x.Customer)
+            .Include(x => x.ARInvoice)
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
+        return cn is null ? null : ToARCreditNoteDto(cn);
+    }
+
+    public async Task<ARCreditNoteDto> CreateARCreditNoteAsync(CreateARCreditNoteRequest req, CancellationToken ct = default)
+    {
+        if (!Enum.TryParse<ARCreditNoteReason>(req.Reason, out var reason))
+            reason = ARCreditNoteReason.Other;
+
+        var count = await _db.CustomerCreditNotes.CountAsync(ct) + 1;
+        var cn = new CustomerCreditNote(_org.OrganizationId, $"CN-{count:D6}",
+            req.CustomerId, req.CreditDate, req.Description,
+            req.SubTotal, req.TaxAmount, reason,
+            req.ARInvoiceId, req.SalesOrderId, req.CustomerRef, req.Notes);
+        _db.CustomerCreditNotes.Add(cn);
+        await _db.SaveChangesAsync(ct);
+        return (await GetARCreditNoteAsync(cn.Id, ct))!;
+    }
+
+    public async Task<ARCreditNoteDto> SubmitCreditNoteForApprovalAsync(Guid id, string submittedBy, CancellationToken ct = default)
+    {
+        var cn = await _db.CustomerCreditNotes
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Credit note not found.");
+
+        var wf = new WorkflowInstance(_org.OrganizationId, WorkflowDocumentType.ARCreditNote,
+            cn.Id, cn.CreditNoteNumber, cn.TotalAmount, submittedBy);
+        wf.AddApprovalStep(1, "Credit Note Approval", "FinanceManager", null);
+        _db.WorkflowInstances.Add(wf);
+        await _db.SaveChangesAsync(ct);
+
+        cn.SubmitForApproval(wf.Id);
+        await _db.SaveChangesAsync(ct);
+        return (await GetARCreditNoteAsync(id, ct))!;
+    }
+
+    public async Task<ARCreditNoteDto> ApproveCreditNoteAsync(Guid id, CancellationToken ct = default)
+    {
+        var cn = await _db.CustomerCreditNotes
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Credit note not found.");
+        cn.WorkflowApproved();   // → internally calls Issue()
+        await _db.SaveChangesAsync(ct);
+        return (await GetARCreditNoteAsync(id, ct))!;
+    }
+
+    public async Task<ARCreditNoteDto> RejectCreditNoteAsync(Guid id, CancellationToken ct = default)
+    {
+        var cn = await _db.CustomerCreditNotes
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Credit note not found.");
+        cn.WorkflowRejected();
+        await _db.SaveChangesAsync(ct);
+        return (await GetARCreditNoteAsync(id, ct))!;
+    }
+
+    public async Task<ARCreditNoteDto> IssueCreditNoteAsync(Guid id, CancellationToken ct = default)
+    {
+        var cn = await _db.CustomerCreditNotes
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Credit note not found.");
+        cn.Issue();
+        await _db.SaveChangesAsync(ct);
+        return (await GetARCreditNoteAsync(id, ct))!;
+    }
+
+    public async Task<ARCreditNoteDto> ApplyCreditToInvoiceAsync(Guid id, ApplyCreditNoteRequest req, CancellationToken ct = default)
+    {
+        var cn = await _db.CustomerCreditNotes
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Credit note not found.");
+
+        var inv = await _db.ARInvoices
+            .FirstOrDefaultAsync(i => i.Id == req.ARInvoiceId && !i.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Invoice not found.");
+
+        cn.ApplyCredit(req.Amount);
+        inv.ApplyPayment(req.Amount);
+        await _db.SaveChangesAsync(ct);
+        return (await GetARCreditNoteAsync(id, ct))!;
+    }
+
+    public async Task<ARCreditNoteDto> VoidCreditNoteAsync(Guid id, CancellationToken ct = default)
+    {
+        var cn = await _db.CustomerCreditNotes
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Credit note not found.");
+        cn.Void();
+        await _db.SaveChangesAsync(ct);
+        return (await GetARCreditNoteAsync(id, ct))!;
+    }
+
+    // ── Dunning / Collections ─────────────────────────────────────────────────
+
+    public async Task<IEnumerable<DunningRecordDto>> GetDunningRecordsAsync(
+        Guid? customerId = null, CancellationToken ct = default)
+    {
+        var query = _db.DunningRecords
+            .Include(d => d.Customer)
+            .Include(d => d.ARInvoice)
+            .Where(d => !d.IsDeleted);
+        if (customerId.HasValue)
+            query = query.Where(d => d.CustomerId == customerId.Value);
+        var list = await query.OrderByDescending(d => d.SentDate).ToListAsync(ct);
+        return list.Select(ToDunningDto);
+    }
+
+    public async Task<DunningRecordDto> CreateDunningAsync(CreateDunningRequest req, CancellationToken ct = default)
+    {
+        if (!Enum.TryParse<DunningLevel>(req.Level, out var level))
+            level = DunningLevel.Reminder;
+
+        var inv = await _db.ARInvoices
+            .FirstOrDefaultAsync(i => i.Id == req.ARInvoiceId && !i.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Invoice not found.");
+
+        var count = await _db.DunningRecords.CountAsync(ct) + 1;
+        var followUpDate = req.FollowUpDate ?? DateTime.UtcNow.Date.AddDays(7);
+        var d = new DunningRecord(_org.OrganizationId, $"DUN-{count:D5}",
+            req.CustomerId, req.ARInvoiceId, level,
+            DateTime.UtcNow.Date, followUpDate,
+            inv.OutstandingAmount, req.AssignedTo, req.Notes);
+        _db.DunningRecords.Add(d);
+        await _db.SaveChangesAsync(ct);
+
+        var created = await _db.DunningRecords
+            .Include(x => x.Customer).Include(x => x.ARInvoice)
+            .FirstAsync(x => x.Id == d.Id, ct);
+        return ToDunningDto(created);
+    }
+
+    public async Task<DunningRecordDto> ResolveDunningAsync(Guid id, string? notes, CancellationToken ct = default)
+    {
+        var d = await _db.DunningRecords
+            .Include(x => x.Customer).Include(x => x.ARInvoice)
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Dunning record not found.");
+        d.Resolve(notes);
+        await _db.SaveChangesAsync(ct);
+        return ToDunningDto(d);
+    }
+
+    public async Task<DunningRecordDto> EscalateDunningAsync(Guid id, CancellationToken ct = default)
+    {
+        var d = await _db.DunningRecords
+            .Include(x => x.Customer).Include(x => x.ARInvoice)
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Dunning record not found.");
+        d.Escalate();
+        await _db.SaveChangesAsync(ct);
+        return ToDunningDto(d);
+    }
+
+    // ── Mapping helpers (S2C additions) ───────────────────────────────────────
+
+    private static QuotationSummaryDto ToQuotationSummaryDto(SalesQuotation q) =>
+        new(q.Id, q.QuotationNumber, q.CustomerId, q.Customer?.Name ?? string.Empty,
+            q.QuotationDate, q.ValidUntil, q.CustomerRef, q.Status.ToString(),
+            q.GrandTotal, q.Lines.Count, q.WorkflowInstanceId, q.ConvertedToSOId, q.CreatedAt);
+
+    private static QuotationDto ToQuotationDto(SalesQuotation q) =>
+        new(q.Id, q.QuotationNumber, q.CustomerId, q.Customer?.Name ?? string.Empty,
+            q.QuotationDate, q.ValidUntil, q.Description, q.CustomerRef, q.Currency,
+            q.Status.ToString(), q.SubTotal, q.TaxTotal, q.DiscountTotal, q.GrandTotal,
+            q.WorkflowInstanceId, q.RejectionReason, q.ConvertedToSOId, q.ConvertedAt,
+            q.Notes, q.CreatedAt,
+            q.Lines.Select((l, i) => new QuotationLineDto(
+                l.Id, i + 1, l.ProductVariantId, l.Sku, l.ProductName,
+                l.VariantDescription, l.UnitOfMeasure, l.Quantity, l.UnitPrice,
+                l.DiscountPct, l.TaxRate, l.LineSubTotal, l.DiscountAmount,
+                l.TaxAmount, l.LineTotal)).ToList());
+
+    private static ARCreditNoteDto ToARCreditNoteDto(CustomerCreditNote cn) =>
+        new(cn.Id, cn.CreditNoteNumber, cn.CustomerId, cn.Customer?.Name ?? string.Empty,
+            cn.ARInvoiceId, cn.ARInvoice?.InvoiceNumber, cn.SalesOrderId, null,
+            cn.CreditDate, cn.Description, cn.CustomerRef,
+            cn.SubTotal, cn.TaxAmount, cn.TotalAmount,
+            cn.AppliedAmount, cn.AvailableCredit,
+            cn.Status.ToString(), cn.Reason.ToString(), cn.Notes,
+            cn.WorkflowInstanceId, cn.CreatedAt);
+
+    private static DunningRecordDto ToDunningDto(DunningRecord d) =>
+        new(d.Id, d.DunningNumber, d.CustomerId, d.Customer?.Name ?? string.Empty,
+            d.ARInvoiceId, d.ARInvoice?.InvoiceNumber ?? string.Empty,
+            d.Level.ToString(), d.Status.ToString(),
+            d.SentDate, d.FollowUpDate, d.OutstandingAmount,
+            d.AssignedTo, d.Notes,
+            d.ResolvedAt, d.ResolutionNotes, d.CreatedAt);
 }

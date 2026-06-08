@@ -56,6 +56,40 @@ public record CreateJournalEntryRequest(
     string JournalType = "General", string Currency = "USD",
     IReadOnlyList<CreateJournalLineRequest>? Lines = null);
 
+// ── Currency ──────────────────────────────────────────────────────────────────
+public record CurrencyDto(
+    Guid     Id,
+    string   Code,
+    string   Name,
+    string   Symbol,
+    int      DecimalPlaces,
+    decimal  ExchangeRate,
+    bool     IsBase,
+    bool     IsActive,
+    int?     NumericCode,
+    string?  Country,
+    DateTime? RateUpdatedAt,
+    DateTime CreatedAt);
+
+public record CreateCurrencyRequest(
+    string  Code,
+    string  Name,
+    string  Symbol,
+    int     DecimalPlaces  = 2,
+    decimal ExchangeRate   = 1m,
+    bool    IsBase         = false,
+    int?    NumericCode    = null,
+    string? Country        = null);
+
+public record UpdateCurrencyRequest(
+    string  Name,
+    string  Symbol,
+    int     DecimalPlaces,
+    string? Country,
+    int?    NumericCode);
+
+public record UpdateExchangeRateRequest(decimal ExchangeRate);
+
 // ── Reports ───────────────────────────────────────────────────────────────────
 public record TrialBalanceLineDto(string AccountNumber, string AccountName,
     string AccountType, decimal TotalDebit, decimal TotalCredit, decimal Balance);

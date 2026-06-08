@@ -44,6 +44,7 @@ public interface IAppDbContext
     DbSet<Account>       Accounts       { get; }
     DbSet<JournalEntry>  JournalEntries { get; }
     DbSet<JournalLine>   JournalLines   { get; }
+    DbSet<Currency>      Currencies     { get; }
 
     // Accounts Receivable
     DbSet<Customer>        Customers         { get; }
@@ -53,6 +54,12 @@ public interface IAppDbContext
     DbSet<SalesOrderLine>  SalesOrderLines   { get; }
     DbSet<ARInvoice>       ARInvoices        { get; }
     DbSet<ARPayment>       ARPayments        { get; }
+
+    // S2C additions
+    DbSet<SalesQuotation>     SalesQuotations     { get; }
+    DbSet<SalesQuotationLine> SalesQuotationLines { get; }
+    DbSet<CustomerCreditNote> CustomerCreditNotes { get; }
+    DbSet<DunningRecord>      DunningRecords      { get; }
 
     // Accounts Payable
     DbSet<Vendor>                   Vendors                   { get; }
@@ -64,6 +71,13 @@ public interface IAppDbContext
     DbSet<PurchaseOrderReceiptLine> PurchaseOrderReceiptLines { get; }
     DbSet<APInvoice>                APInvoices                { get; }
     DbSet<APPayment>                APPayments                { get; }
+
+    // P2P additions
+    DbSet<PurchaseRequisition>     PurchaseRequisitions     { get; }
+    DbSet<PurchaseRequisitionLine> PurchaseRequisitionLines { get; }
+    DbSet<VendorCreditNote>        VendorCreditNotes        { get; }
+    DbSet<PaymentProposal>         PaymentProposals         { get; }
+    DbSet<PaymentProposalLine>     PaymentProposalLines     { get; }
 
     // System Admin
     DbSet<AppUser>        AppUsers        { get; }

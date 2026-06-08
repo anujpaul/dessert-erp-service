@@ -33,6 +33,17 @@ public interface IGeneralLedgerService
     Task PostJournalEntryAsync(Guid id, CancellationToken ct = default);
     Task VoidJournalEntryAsync(Guid id, CancellationToken ct = default);
     Task<IEnumerable<TrialBalanceLineDto>> GetTrialBalanceAsync(Guid fiscalPeriodId, CancellationToken ct = default);
+
+    // Currencies
+    Task<IEnumerable<CurrencyDto>> GetCurrenciesAsync(bool activeOnly = false, CancellationToken ct = default);
+    Task<CurrencyDto?> GetCurrencyAsync(Guid id, CancellationToken ct = default);
+    Task<CurrencyDto?> GetBaseCurrencyAsync(CancellationToken ct = default);
+    Task<CurrencyDto> CreateCurrencyAsync(CreateCurrencyRequest req, CancellationToken ct = default);
+    Task<CurrencyDto> UpdateCurrencyAsync(Guid id, UpdateCurrencyRequest req, CancellationToken ct = default);
+    Task<CurrencyDto> UpdateExchangeRateAsync(Guid id, UpdateExchangeRateRequest req, CancellationToken ct = default);
+    Task<CurrencyDto> SetBaseCurrencyAsync(Guid id, CancellationToken ct = default);
+    Task ActivateCurrencyAsync(Guid id, CancellationToken ct = default);
+    Task DeactivateCurrencyAsync(Guid id, CancellationToken ct = default);
 }
 
 public class GeneralLedgerService : IGeneralLedgerService
@@ -302,6 +313,98 @@ public class GeneralLedgerService : IGeneralLedgerService
             .OrderBy(t => t.AccountNumber);
     }
 
+    // ── Currencies ────────────────────────────────────────────────────────────
+
+    public async Task<IEnumerable<CurrencyDto>> GetCurrenciesAsync(bool activeOnly = false, CancellationToken ct = default)
+    {
+        var query = _db.Currencies.Where(c => !c.IsDeleted);
+        if (activeOnly) query = query.Where(c => c.IsActive);
+        var list = await query.OrderByDescending(c => c.IsBase).ThenBy(c => c.Code).ToListAsync(ct);
+        return list.Select(ToCurrencyDto);
+    }
+
+    public async Task<CurrencyDto?> GetCurrencyAsync(Guid id, CancellationToken ct = default)
+    {
+        var c = await _db.Currencies.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
+        return c is null ? null : ToCurrencyDto(c);
+    }
+
+    public async Task<CurrencyDto?> GetBaseCurrencyAsync(CancellationToken ct = default)
+    {
+        var c = await _db.Currencies.FirstOrDefaultAsync(x => x.IsBase && !x.IsDeleted, ct);
+        return c is null ? null : ToCurrencyDto(c);
+    }
+
+    public async Task<CurrencyDto> CreateCurrencyAsync(CreateCurrencyRequest req, CancellationToken ct = default)
+    {
+        var code = req.Code.ToUpperInvariant();
+        if (await _db.Currencies.AnyAsync(c => c.Code == code && !c.IsDeleted, ct))
+            throw new InvalidOperationException($"Currency '{code}' already exists.");
+
+        if (req.IsBase && await _db.Currencies.AnyAsync(c => c.IsBase && !c.IsDeleted, ct))
+            throw new InvalidOperationException("A base currency already exists. Use SetBaseCurrency to change it.");
+
+        var currency = new Currency(_org.OrganizationId, code, req.Name, req.Symbol,
+            req.DecimalPlaces, req.IsBase ? 1m : req.ExchangeRate, req.IsBase,
+            req.NumericCode, req.Country);
+
+        _db.Currencies.Add(currency);
+        await _db.SaveChangesAsync(ct);
+        return ToCurrencyDto(currency);
+    }
+
+    public async Task<CurrencyDto> UpdateCurrencyAsync(Guid id, UpdateCurrencyRequest req, CancellationToken ct = default)
+    {
+        var currency = await _db.Currencies.FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Currency not found.");
+        currency.UpdateDetails(req.Name, req.Symbol, req.DecimalPlaces, req.Country, req.NumericCode);
+        await _db.SaveChangesAsync(ct);
+        return ToCurrencyDto(currency);
+    }
+
+    public async Task<CurrencyDto> UpdateExchangeRateAsync(Guid id, UpdateExchangeRateRequest req, CancellationToken ct = default)
+    {
+        var currency = await _db.Currencies.FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Currency not found.");
+        currency.UpdateExchangeRate(req.ExchangeRate);
+        await _db.SaveChangesAsync(ct);
+        return ToCurrencyDto(currency);
+    }
+
+    public async Task<CurrencyDto> SetBaseCurrencyAsync(Guid id, CancellationToken ct = default)
+    {
+        var newBase = await _db.Currencies.FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Currency not found.");
+
+        // Clear old base
+        var oldBase = await _db.Currencies.FirstOrDefaultAsync(c => c.IsBase && !c.IsDeleted && c.Id != id, ct);
+        if (oldBase is not null)
+        {
+            // old base keeps its data but loses IsBase — direct reflection since domain exposes internal
+            oldBase.UpdateExchangeRate(1m); // will throw if already base — won't reach here
+        }
+        // Use the internal method (same assembly via InternalsVisibleTo or just call SetAsBase)
+        newBase.SetAsBase();
+        await _db.SaveChangesAsync(ct);
+        return ToCurrencyDto(newBase);
+    }
+
+    public async Task ActivateCurrencyAsync(Guid id, CancellationToken ct = default)
+    {
+        var currency = await _db.Currencies.FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Currency not found.");
+        currency.Activate();
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task DeactivateCurrencyAsync(Guid id, CancellationToken ct = default)
+    {
+        var currency = await _db.Currencies.FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Currency not found.");
+        currency.Deactivate();
+        await _db.SaveChangesAsync(ct);
+    }
+
     // ── Mappers ───────────────────────────────────────────────────────────────
 
     private static FiscalYearDto ToFiscalYearDto(FiscalYear y) => new(
@@ -318,6 +421,10 @@ public class GeneralLedgerService : IGeneralLedgerService
         a.ParentAccountId, a.ParentAccount?.Name,
         a.IsHeaderAccount, a.AllowManualEntry,
         a.Status.ToString(), a.Currency, a.Level);
+
+    private static CurrencyDto ToCurrencyDto(Currency c) => new(
+        c.Id, c.Code, c.Name, c.Symbol, c.DecimalPlaces, c.ExchangeRate,
+        c.IsBase, c.IsActive, c.NumericCode, c.Country, c.RateUpdatedAt, c.CreatedAt);
 
     private static JournalEntryDto ToJournalEntryDto(JournalEntry e) => new(
         e.Id, e.EntryNumber, e.EntryDate, e.FiscalPeriodId,

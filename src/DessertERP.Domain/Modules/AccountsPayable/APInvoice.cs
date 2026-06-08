@@ -56,7 +56,11 @@ public class APInvoice : BaseEntity
     /// <summary>Reason given by the manager when bypassing a match exception.</summary>
     public string? BypassReason { get; private set; }
 
-    public Guid? JournalEntryId { get; private set; }
+    public Guid? JournalEntryId      { get; private set; }
+
+    /// <summary>Set when the invoice is submitted for workflow approval.</summary>
+    public Guid? WorkflowInstanceId  { get; private set; }
+    public bool  IsSubmittedForApproval => WorkflowInstanceId.HasValue && Status == APInvoiceStatus.Draft;
 
     // ── Navigations ───────────────────────────────────────────────────────────
     public Vendor?        Vendor                  { get; private set; }
@@ -236,6 +240,36 @@ public class APInvoice : BaseEntity
 
         LinkedPrepaymentInvoiceId = prepaymentInvoice.Id;
         PrepaymentApplied = prepaymentInvoice.TotalAmount;
+        SetUpdated();
+    }
+
+    /// <summary>
+    /// Submit for workflow approval — the service layer creates the WorkflowInstance first.
+    /// </summary>
+    public void SubmitForApproval(Guid workflowInstanceId)
+    {
+        if (Status != APInvoiceStatus.Draft)
+            throw new InvalidOperationException("Only Draft invoices can be submitted for approval.");
+        WorkflowInstanceId = workflowInstanceId;
+        // Status stays Draft until the workflow completes
+        SetUpdated();
+    }
+
+    /// <summary>Called by the workflow callback when all steps approve.</summary>
+    public void WorkflowApproved()
+    {
+        if (Status != APInvoiceStatus.Draft)
+            throw new InvalidOperationException("Invoice is not in Draft status.");
+
+        // Reuse the existing Approve() validation (3WM checks etc.)
+        Approve();
+    }
+
+    /// <summary>Called by the workflow callback when a step rejects.</summary>
+    public void WorkflowRejected()
+    {
+        // Invoice stays Draft — clerk can correct and resubmit
+        WorkflowInstanceId = null;
         SetUpdated();
     }
 

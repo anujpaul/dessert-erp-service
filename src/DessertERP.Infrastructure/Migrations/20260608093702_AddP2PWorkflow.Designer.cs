@@ -3,6 +3,7 @@ using System;
 using DessertERP.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DessertERP.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260608093702_AddP2PWorkflow")]
+    partial class AddP2PWorkflow
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1019,9 +1022,6 @@ namespace DessertERP.Infrastructure.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp without time zone");
 
-                    b.Property<Guid?>("WorkflowInstanceId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("Id");
 
                     b.HasIndex("CustomerId");
@@ -1299,166 +1299,6 @@ namespace DessertERP.Infrastructure.Migrations
                     b.ToTable("customer_contacts", (string)null);
                 });
 
-            modelBuilder.Entity("DessertERP.Domain.Modules.AccountsReceivable.CustomerCreditNote", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("ARInvoiceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("AppliedAmount")
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<DateTime>("CreditDate")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("CreditNoteNumber")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<Guid>("CustomerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CustomerRef")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<Guid>("OrganizationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<Guid?>("SalesOrderId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<decimal>("SubTotal")
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<decimal>("TaxAmount")
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<decimal>("TotalAmount")
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<Guid?>("WorkflowInstanceId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ARInvoiceId");
-
-                    b.HasIndex("CustomerId");
-
-                    b.HasIndex("OrganizationId", "CreditNoteNumber")
-                        .IsUnique();
-
-                    b.ToTable("customer_credit_notes", (string)null);
-                });
-
-            modelBuilder.Entity("DessertERP.Domain.Modules.AccountsReceivable.DunningRecord", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ARInvoiceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("AssignedTo")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<Guid>("CustomerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("DunningNumber")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<DateTime>("FollowUpDate")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Level")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<Guid>("OrganizationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("OutstandingAmount")
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<string>("ResolutionNotes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<DateTime?>("ResolvedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<DateTime>("SentDate")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ARInvoiceId");
-
-                    b.HasIndex("CustomerId");
-
-                    b.HasIndex("OrganizationId", "DunningNumber")
-                        .IsUnique();
-
-                    b.ToTable("dunning_records", (string)null);
-                });
-
             modelBuilder.Entity("DessertERP.Domain.Modules.AccountsReceivable.SalesOrder", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1486,13 +1326,6 @@ namespace DessertERP.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime?>("DeliveredAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("DeliveryReference")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -1525,10 +1358,6 @@ namespace DessertERP.Infrastructure.Migrations
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("RejectionReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
                     b.Property<DateTime?>("RequestedShipDate")
                         .HasColumnType("timestamp without time zone");
 
@@ -1545,9 +1374,6 @@ namespace DessertERP.Infrastructure.Migrations
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp without time zone");
-
-                    b.Property<Guid?>("WorkflowInstanceId")
-                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -1618,159 +1444,6 @@ namespace DessertERP.Infrastructure.Migrations
                     b.HasIndex("SalesOrderId");
 
                     b.ToTable("sales_order_lines", (string)null);
-                });
-
-            modelBuilder.Entity("DessertERP.Domain.Modules.AccountsReceivable.SalesQuotation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("ConvertedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<Guid?>("ConvertedToSOId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)");
-
-                    b.Property<Guid>("CustomerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CustomerRef")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<decimal>("DiscountTotal")
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<decimal>("GrandTotal")
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<Guid>("OrganizationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("QuotationDate")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("QuotationNumber")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<string>("RejectionReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<decimal>("SubTotal")
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<decimal>("TaxTotal")
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<DateTime>("ValidUntil")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<Guid?>("WorkflowInstanceId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CustomerId");
-
-                    b.HasIndex("OrganizationId", "QuotationNumber")
-                        .IsUnique();
-
-                    b.ToTable("sales_quotations", (string)null);
-                });
-
-            modelBuilder.Entity("DessertERP.Domain.Modules.AccountsReceivable.SalesQuotationLine", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<decimal>("DiscountPct")
-                        .HasColumnType("numeric(8,4)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("LineNumber")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ProductName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<Guid>("ProductVariantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Quantity")
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<Guid>("QuotationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Sku")
-                        .IsRequired()
-                        .HasMaxLength(60)
-                        .HasColumnType("character varying(60)");
-
-                    b.Property<decimal>("TaxRate")
-                        .HasColumnType("numeric(8,4)");
-
-                    b.Property<string>("UnitOfMeasure")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<decimal>("UnitPrice")
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("VariantDescription")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("QuotationId");
-
-                    b.ToTable("sales_quotation_lines", (string)null);
                 });
 
             modelBuilder.Entity("DessertERP.Domain.Modules.DataManagement.BatchJobConfig", b =>
@@ -2358,69 +2031,6 @@ namespace DessertERP.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("account_types", (string)null);
-                });
-
-            modelBuilder.Entity("DessertERP.Domain.Modules.GeneralLedger.Currency", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)");
-
-                    b.Property<string>("Country")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<int>("DecimalPlaces")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("ExchangeRate")
-                        .HasColumnType("numeric(18,6)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsBase")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int?>("NumericCode")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("OrganizationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("RateUpdatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("Symbol")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OrganizationId", "Code")
-                        .IsUnique();
-
-                    b.ToTable("currencies", (string)null);
                 });
 
             modelBuilder.Entity("DessertERP.Domain.Modules.GeneralLedger.FiscalPeriod", b =>
@@ -5062,43 +4672,6 @@ namespace DessertERP.Infrastructure.Migrations
                     b.Navigation("Customer");
                 });
 
-            modelBuilder.Entity("DessertERP.Domain.Modules.AccountsReceivable.CustomerCreditNote", b =>
-                {
-                    b.HasOne("DessertERP.Domain.Modules.AccountsReceivable.ARInvoice", "ARInvoice")
-                        .WithMany()
-                        .HasForeignKey("ARInvoiceId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("DessertERP.Domain.Modules.AccountsReceivable.Customer", "Customer")
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ARInvoice");
-
-                    b.Navigation("Customer");
-                });
-
-            modelBuilder.Entity("DessertERP.Domain.Modules.AccountsReceivable.DunningRecord", b =>
-                {
-                    b.HasOne("DessertERP.Domain.Modules.AccountsReceivable.ARInvoice", "ARInvoice")
-                        .WithMany()
-                        .HasForeignKey("ARInvoiceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("DessertERP.Domain.Modules.AccountsReceivable.Customer", "Customer")
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ARInvoice");
-
-                    b.Navigation("Customer");
-                });
-
             modelBuilder.Entity("DessertERP.Domain.Modules.AccountsReceivable.SalesOrder", b =>
                 {
                     b.HasOne("DessertERP.Domain.Modules.AccountsReceivable.Customer", "Customer")
@@ -5127,28 +4700,6 @@ namespace DessertERP.Infrastructure.Migrations
                     b.Navigation("ProductVariant");
 
                     b.Navigation("SalesOrder");
-                });
-
-            modelBuilder.Entity("DessertERP.Domain.Modules.AccountsReceivable.SalesQuotation", b =>
-                {
-                    b.HasOne("DessertERP.Domain.Modules.AccountsReceivable.Customer", "Customer")
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Customer");
-                });
-
-            modelBuilder.Entity("DessertERP.Domain.Modules.AccountsReceivable.SalesQuotationLine", b =>
-                {
-                    b.HasOne("DessertERP.Domain.Modules.AccountsReceivable.SalesQuotation", "Quotation")
-                        .WithMany("Lines")
-                        .HasForeignKey("QuotationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Quotation");
                 });
 
             modelBuilder.Entity("DessertERP.Domain.Modules.DataManagement.ImportJobRow", b =>
@@ -5558,11 +5109,6 @@ namespace DessertERP.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("DessertERP.Domain.Modules.AccountsReceivable.SalesOrder", b =>
-                {
-                    b.Navigation("Lines");
-                });
-
-            modelBuilder.Entity("DessertERP.Domain.Modules.AccountsReceivable.SalesQuotation", b =>
                 {
                     b.Navigation("Lines");
                 });

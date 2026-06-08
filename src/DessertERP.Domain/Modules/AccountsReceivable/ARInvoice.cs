@@ -19,7 +19,11 @@ public class ARInvoice : BaseEntity
     public decimal TotalAmount { get; private set; }
     public decimal PaidAmount { get; private set; }
     public ARInvoiceStatus Status { get; private set; } = ARInvoiceStatus.Draft;
-    public Guid? JournalEntryId { get; private set; }
+    public Guid? JournalEntryId      { get; private set; }
+    public Guid? WorkflowInstanceId  { get; private set; }
+
+    /// <summary>True when submitted for approval but not yet approved/rejected.</summary>
+    public bool IsSubmittedForApproval => WorkflowInstanceId.HasValue && Status == ARInvoiceStatus.Draft;
 
     public Customer? Customer { get; private set; }
     public SalesOrder? SalesOrder { get; private set; }
@@ -47,6 +51,28 @@ public class ARInvoice : BaseEntity
         TaxAmount = taxAmount;
         DiscountAmount = discountAmount;
         TotalAmount = subTotal - discountAmount + taxAmount;
+    }
+
+    /// <summary>Submit for approval workflow. Service creates WorkflowInstance first.</summary>
+    public void SubmitForApproval(Guid workflowInstanceId)
+    {
+        if (Status != ARInvoiceStatus.Draft)
+            throw new InvalidOperationException("Only Draft invoices can be submitted for approval.");
+        WorkflowInstanceId = workflowInstanceId;
+        SetUpdated();
+    }
+
+    /// <summary>Called by workflow engine when all steps approve — issues the invoice.</summary>
+    public void WorkflowApproved(Guid? journalEntryId = null)
+    {
+        Issue(journalEntryId);
+    }
+
+    /// <summary>Called by workflow engine when a step rejects — keeps invoice as Draft.</summary>
+    public void WorkflowRejected()
+    {
+        WorkflowInstanceId = null;
+        SetUpdated();
     }
 
     public void Issue(Guid? journalEntryId = null)

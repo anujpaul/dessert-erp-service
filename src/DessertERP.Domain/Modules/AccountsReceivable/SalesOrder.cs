@@ -2,7 +2,7 @@ using DessertERP.Domain.Common;
 
 namespace DessertERP.Domain.Modules.AccountsReceivable;
 
-public enum SalesOrderStatus { Draft, Confirmed, Picking, Shipped, Invoiced, Closed, Cancelled }
+public enum SalesOrderStatus { Draft, PendingApproval, Confirmed, Picking, Shipped, Invoiced, Closed, Cancelled }
 
 public class SalesOrder : BaseEntity
 {
@@ -22,6 +22,14 @@ public class SalesOrder : BaseEntity
     public decimal DiscountTotal { get; private set; }
     public decimal GrandTotal { get; private set; }
     public Guid? ARInvoiceId { get; private set; }
+
+    // Workflow
+    public Guid?  WorkflowInstanceId { get; private set; }
+    public string? RejectionReason   { get; private set; }
+
+    // Delivery tracking
+    public DateTime? DeliveredAt       { get; private set; }
+    public string?   DeliveryReference { get; private set; }
 
     // Export tracking
     public bool      IsExported { get; private set; }
@@ -75,6 +83,37 @@ public class SalesOrder : BaseEntity
         SetUpdated();
     }
 
+    /// <summary>Submit the order for approval workflow. Service creates the WorkflowInstance first.</summary>
+    public void SubmitForApproval(Guid workflowInstanceId)
+    {
+        if (Status != SalesOrderStatus.Draft)
+            throw new InvalidOperationException("Only a Draft order can be submitted for approval.");
+        if (!_lines.Any())
+            throw new InvalidOperationException("Cannot submit an order with no lines.");
+        Status             = SalesOrderStatus.PendingApproval;
+        WorkflowInstanceId = workflowInstanceId;
+        SetUpdated();
+    }
+
+    /// <summary>Called by the workflow engine when all steps approve.</summary>
+    public void WorkflowApproved()
+    {
+        if (Status != SalesOrderStatus.PendingApproval)
+            throw new InvalidOperationException("Order is not pending approval.");
+        Status = SalesOrderStatus.Confirmed;
+        SetUpdated();
+    }
+
+    /// <summary>Called by the workflow engine when a step rejects.</summary>
+    public void WorkflowRejected(string reason)
+    {
+        if (Status != SalesOrderStatus.PendingApproval)
+            throw new InvalidOperationException("Order is not pending approval.");
+        Status          = SalesOrderStatus.Draft;
+        RejectionReason = reason;
+        SetUpdated();
+    }
+
     public void Confirm()
     {
         if (Status != SalesOrderStatus.Draft)
@@ -99,6 +138,16 @@ public class SalesOrder : BaseEntity
             throw new InvalidOperationException("Only a Picking order can be shipped.");
         Status = SalesOrderStatus.Shipped;
         ActualShipDate = shipDate;
+        SetUpdated();
+    }
+
+    /// <summary>Records proof-of-delivery (POD) confirmation on a shipped order.</summary>
+    public void ConfirmDelivery(DateTime deliveredAt, string? reference = null)
+    {
+        if (Status != SalesOrderStatus.Shipped)
+            throw new InvalidOperationException("Only a Shipped order can be delivery-confirmed.");
+        DeliveredAt       = deliveredAt;
+        DeliveryReference = reference;
         SetUpdated();
     }
 

@@ -238,4 +238,237 @@ public class AccountsReceivableController : ControllerBase
         try { await _svc.SetPrimaryCustomerContactAsync(customerId, contactId, ct); return NoContent(); }
         catch (InvalidOperationException ex) { return NotFound(new { error = ex.Message }); }
     }
+
+    // ── SO Workflow ───────────────────────────────────────────────────────────
+
+    [HttpPost("sales-orders/{id:guid}/submit-for-approval")]
+    public async Task<IActionResult> SubmitSOForApproval(Guid id, [FromBody] SubmitSOForApprovalRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.SubmitSOForApprovalAsync(id, req.SubmittedBy, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("sales-orders/{id:guid}/approve")]
+    public async Task<IActionResult> ApproveSO(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.ApproveSOAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("sales-orders/{id:guid}/reject")]
+    public async Task<IActionResult> RejectSO(Guid id, [FromBody] SOWorkflowOutcomeRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.RejectSOAsync(id, req.Reason ?? "Rejected", ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("sales-orders/{id:guid}/confirm-delivery")]
+    public async Task<IActionResult> ConfirmDelivery(Guid id, [FromBody] ConfirmDeliveryRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.ConfirmDeliveryAsync(id, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    // ── AR Invoice Workflow ───────────────────────────────────────────────────
+
+    [HttpPost("invoices/{id:guid}/submit-for-approval")]
+    public async Task<IActionResult> SubmitInvoiceForApproval(Guid id, [FromBody] SubmitARInvoiceForApprovalRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.SubmitARInvoiceForApprovalAsync(id, req.SubmittedBy, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("invoices/{id:guid}/approve")]
+    public async Task<IActionResult> ApproveInvoice(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.ApproveARInvoiceAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("invoices/{id:guid}/reject")]
+    public async Task<IActionResult> RejectInvoice(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.RejectARInvoiceAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    // ── Sales Quotations ──────────────────────────────────────────────────────
+
+    [HttpGet("quotations")]
+    public async Task<IActionResult> GetQuotations(
+        [FromQuery] string? status, [FromQuery] Guid? customerId, CancellationToken ct)
+        => Ok(await _svc.GetQuotationsAsync(status, customerId, ct));
+
+    [HttpGet("quotations/{id:guid}")]
+    public async Task<IActionResult> GetQuotation(Guid id, CancellationToken ct)
+    {
+        var dto = await _svc.GetQuotationAsync(id, ct);
+        return dto is null ? NotFound() : Ok(dto);
+    }
+
+    [HttpPost("quotations")]
+    public async Task<IActionResult> CreateQuotation([FromBody] CreateQuotationRequest req, CancellationToken ct)
+    {
+        try { return StatusCode(201, await _svc.CreateQuotationAsync(req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("quotations/{id:guid}/lines")]
+    public async Task<IActionResult> AddQuotationLine(Guid id, [FromBody] AddQuotationLineRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.AddQuotationLineAsync(id, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpDelete("quotations/{id:guid}/lines/{lineId:guid}")]
+    public async Task<IActionResult> RemoveQuotationLine(Guid id, Guid lineId, CancellationToken ct)
+    {
+        try { await _svc.RemoveQuotationLineAsync(id, lineId, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("quotations/{id:guid}/submit-for-approval")]
+    public async Task<IActionResult> SubmitQuotationForApproval(Guid id, [FromBody] SubmitSOForApprovalRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.SubmitQuotationForApprovalAsync(id, req.SubmittedBy, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("quotations/{id:guid}/approve")]
+    public async Task<IActionResult> ApproveQuotation(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.ApproveQuotationAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("quotations/{id:guid}/reject")]
+    public async Task<IActionResult> RejectQuotation(Guid id, [FromBody] SOWorkflowOutcomeRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.RejectQuotationAsync(id, req.Reason ?? "Rejected", ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("quotations/{id:guid}/send")]
+    public async Task<IActionResult> SendQuotation(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.SendQuotationAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("quotations/{id:guid}/accept")]
+    public async Task<IActionResult> AcceptQuotation(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.AcceptQuotationAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("quotations/{id:guid}/reject-by-customer")]
+    public async Task<IActionResult> RejectByCustomer(Guid id, [FromBody] SOWorkflowOutcomeRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.RejectByCustomerAsync(id, req.Reason, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("quotations/{id:guid}/convert-to-so")]
+    public async Task<IActionResult> ConvertQuotationToSO(Guid id, [FromBody] ConvertQuotationToSORequest req, CancellationToken ct)
+    {
+        try { return StatusCode(201, await _svc.ConvertQuotationToSOAsync(id, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("quotations/{id:guid}/cancel")]
+    public async Task<IActionResult> CancelQuotation(Guid id, CancellationToken ct)
+    {
+        try { await _svc.CancelQuotationAsync(id, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    // ── AR Credit Notes ───────────────────────────────────────────────────────
+
+    [HttpGet("credit-notes")]
+    public async Task<IActionResult> GetCreditNotes([FromQuery] Guid? customerId, CancellationToken ct)
+        => Ok(await _svc.GetARCreditNotesAsync(customerId, ct));
+
+    [HttpGet("credit-notes/{id:guid}")]
+    public async Task<IActionResult> GetCreditNote(Guid id, CancellationToken ct)
+    {
+        var dto = await _svc.GetARCreditNoteAsync(id, ct);
+        return dto is null ? NotFound() : Ok(dto);
+    }
+
+    [HttpPost("credit-notes")]
+    public async Task<IActionResult> CreateCreditNote([FromBody] CreateARCreditNoteRequest req, CancellationToken ct)
+    {
+        try { return StatusCode(201, await _svc.CreateARCreditNoteAsync(req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("credit-notes/{id:guid}/submit-for-approval")]
+    public async Task<IActionResult> SubmitCreditNoteForApproval(Guid id, [FromBody] SubmitCreditNoteForApprovalRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.SubmitCreditNoteForApprovalAsync(id, req.SubmittedBy, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("credit-notes/{id:guid}/approve")]
+    public async Task<IActionResult> ApproveCreditNote(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.ApproveCreditNoteAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("credit-notes/{id:guid}/reject")]
+    public async Task<IActionResult> RejectCreditNote(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.RejectCreditNoteAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("credit-notes/{id:guid}/issue")]
+    public async Task<IActionResult> IssueCreditNote(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.IssueCreditNoteAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("credit-notes/{id:guid}/apply")]
+    public async Task<IActionResult> ApplyCreditNote(Guid id, [FromBody] ApplyCreditNoteRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.ApplyCreditToInvoiceAsync(id, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("credit-notes/{id:guid}/void")]
+    public async Task<IActionResult> VoidCreditNote(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.VoidCreditNoteAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    // ── Dunning / Collections ─────────────────────────────────────────────────
+
+    [HttpGet("dunning")]
+    public async Task<IActionResult> GetDunningRecords([FromQuery] Guid? customerId, CancellationToken ct)
+        => Ok(await _svc.GetDunningRecordsAsync(customerId, ct));
+
+    [HttpPost("dunning")]
+    public async Task<IActionResult> CreateDunning([FromBody] CreateDunningRequest req, CancellationToken ct)
+    {
+        try { return StatusCode(201, await _svc.CreateDunningAsync(req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("dunning/{id:guid}/resolve")]
+    public async Task<IActionResult> ResolveDunning(Guid id, [FromBody] SOWorkflowOutcomeRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.ResolveDunningAsync(id, req.Reason, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("dunning/{id:guid}/escalate")]
+    public async Task<IActionResult> EscalateDunning(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.EscalateDunningAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
 }

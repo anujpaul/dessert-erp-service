@@ -13,6 +13,8 @@ public enum WorkflowDocumentType
     PurchaseOrder,
     ARInvoice,
     SalesOrder,
+    SalesQuotation,
+    ARCreditNote,
     JournalEntry,
     ExpenseReport,
 }

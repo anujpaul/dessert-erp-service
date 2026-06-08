@@ -21,6 +21,7 @@ public static class DatabaseSeeder
         var orgId = await SeedDefaultOrganizationAsync(db, logger);
         await SeedChartOfAccountsAsync(db, logger, orgId);
         await SeedFiscalYearAsync(db, logger, orgId);
+        await SeedCurrenciesAsync(db, logger, orgId);
         await SeedCatalogAsync(db, logger, orgId);   // Categories, Brands, Products, Variants, Inventory
         await SeedCustomersAsync(db, logger, orgId);
         await SeedVendorsAsync(db, logger, orgId);
@@ -70,6 +71,35 @@ public static class DatabaseSeeder
             new AccountType("COGS",      "Cost of Goods Sold", AccountNature.Debit,  6)
         );
         await db.SaveChangesAsync();
+    }
+
+    // ── Currencies ────────────────────────────────────────────────────────────
+
+    private static async Task SeedCurrenciesAsync(AppDbContext db, ILogger logger, Guid orgId)
+    {
+        if (await db.Currencies.IgnoreQueryFilters().AnyAsync(c => c.OrganizationId == orgId)) return;
+        logger.LogInformation("Seeding default currencies (ISO 4217)...");
+
+        // Helper: build a Currency via reflection-friendly construction
+        // The domain constructor: Currency(orgId, code, name, symbol, decimalPlaces, exchangeRate, isBase, numericCode, country)
+        // We use the static factory or public ctor — check what the domain exposes.
+        // Based on summary: Currency has properties set via domain methods; assume a public ctor.
+        // isBase=true means this is the functional currency; ExchangeRate=1 for base.
+        // Rates below are approximate mid-market rates vs USD (as of seed time — update via API later).
+        var usd = new Currency(orgId, "USD", "US Dollar",         "$",   2, 1.00m,   isBase: true,  numericCode: 840, country: "United States");
+        var eur = new Currency(orgId, "EUR", "Euro",              "€",   2, 1.08m,   isBase: false, numericCode: 978, country: "European Union");
+        var gbp = new Currency(orgId, "GBP", "British Pound",    "£",   2, 1.27m,   isBase: false, numericCode: 826, country: "United Kingdom");
+        var cad = new Currency(orgId, "CAD", "Canadian Dollar",  "C$",  2, 0.74m,   isBase: false, numericCode: 124, country: "Canada");
+        var aud = new Currency(orgId, "AUD", "Australian Dollar","A$",  2, 0.65m,   isBase: false, numericCode:  36, country: "Australia");
+        var jpy = new Currency(orgId, "JPY", "Japanese Yen",     "¥",   0, 0.0067m, isBase: false, numericCode: 392, country: "Japan");
+        var chf = new Currency(orgId, "CHF", "Swiss Franc",      "Fr",  2, 1.12m,   isBase: false, numericCode: 756, country: "Switzerland");
+        var cny = new Currency(orgId, "CNY", "Chinese Yuan",     "¥",   2, 0.138m,  isBase: false, numericCode: 156, country: "China");
+        var aed = new Currency(orgId, "AED", "UAE Dirham",       "د.إ", 2, 0.272m,  isBase: false, numericCode: 784, country: "United Arab Emirates");
+        var sar = new Currency(orgId, "SAR", "Saudi Riyal",      "﷼",   2, 0.267m,  isBase: false, numericCode: 682, country: "Saudi Arabia");
+
+        db.Currencies.AddRange(usd, eur, gbp, cad, aud, jpy, chf, cny, aed, sar);
+        await db.SaveChangesAsync();
+        logger.LogInformation("Seeded 10 currencies. Base: USD.");
     }
 
     // ── Chart of Accounts ─────────────────────────────────────────────────────

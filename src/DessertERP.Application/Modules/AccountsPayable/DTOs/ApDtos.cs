@@ -155,3 +155,84 @@ public record CreateAPPaymentRequest(
 public record APAgingDto(string VendorNumber, string VendorName,
     decimal Current, decimal Days1_30, decimal Days31_60, decimal Days61_90,
     decimal Over90, decimal Total);
+
+// ── Purchase Requisitions ─────────────────────────────────────────────────────
+public record PRSummaryDto(
+    Guid Id, string RequisitionNumber, string RequestedBy,
+    string? DepartmentCode, DateTime NeededByDate,
+    string Status, decimal TotalEstimatedCost, int LineCount,
+    Guid? WorkflowInstanceId, Guid? ConvertedToPOId, DateTime CreatedAt);
+
+public record PRLineDto(
+    Guid Id, int LineNumber, Guid? ProductId,
+    string Description, decimal Quantity, string UnitOfMeasure,
+    decimal EstimatedUnitCost, decimal EstimatedTotalCost,
+    Guid? SuggestedVendorId, string? GlAccountCode, string? Notes);
+
+public record PRDto(
+    Guid Id, string RequisitionNumber, string RequestedBy,
+    string? DepartmentCode, string? CostCenterCode,
+    DateTime NeededByDate, string Status, decimal TotalEstimatedCost,
+    Guid? WorkflowInstanceId, Guid? ConvertedToPOId,
+    string? RejectionReason, string? Notes, DateTime CreatedAt,
+    IReadOnlyList<PRLineDto> Lines);
+
+public record CreatePRRequest(
+    string RequestedBy, DateTime NeededByDate,
+    string? DepartmentCode = null, string? CostCenterCode = null,
+    string? Notes = null,
+    IReadOnlyList<AddPRLineRequest>? Lines = null);
+
+public record AddPRLineRequest(
+    string Description, decimal Quantity, string UnitOfMeasure = "EA",
+    decimal EstimatedUnitCost = 0, Guid? ProductId = null,
+    Guid? SuggestedVendorId = null, string? GlAccountCode = null,
+    string? Notes = null);
+
+/// <summary>Maps PR line Ids → ProductVariantIds when converting a PR to a PO.</summary>
+public record ConvertPRToPORequest(
+    Guid VendorId, DateTime OrderDate,
+    /// <summary>Maps each PRLineId to the ProductVariantId to use on the PO line.</summary>
+    Dictionary<Guid, Guid>? ProductVariantIds = null,
+    string? Currency = "USD", DateTime? ExpectedDate = null);
+
+// ── Payment Proposals ─────────────────────────────────────────────────────────
+public record PaymentProposalSummaryDto(
+    Guid Id, string ProposalNumber, DateTime ProposalDate, DateTime PaymentDate,
+    string PaymentMethod, string Status, decimal TotalAmount,
+    int LineCount, DateTime? ProcessedAt, string? ProcessedBy, DateTime CreatedAt);
+
+public record PaymentProposalLineDto(
+    Guid Id, Guid APInvoiceId, string InvoiceNumber,
+    Guid VendorId, string VendorName, decimal ProposedAmount,
+    DateTime InvoiceDueDate, Guid? APPaymentId);
+
+public record PaymentProposalDto(
+    Guid Id, string ProposalNumber, DateTime ProposalDate, DateTime PaymentDate,
+    string PaymentMethod, string? BankAccount, string Status, decimal TotalAmount,
+    DateTime? ProcessedAt, string? ProcessedBy, string? Notes, DateTime CreatedAt,
+    IReadOnlyList<PaymentProposalLineDto> Lines);
+
+public record CreatePaymentProposalRequest(
+    DateTime ProposalDate, DateTime PaymentDate,
+    string PaymentMethod = "BankTransfer",
+    string? BankAccount = null, string? Notes = null);
+
+// ── Vendor Credit Notes ───────────────────────────────────────────────────────
+public record CreditNoteDto(
+    Guid Id, string CreditNoteNumber, Guid VendorId, string VendorName,
+    Guid? APInvoiceId, Guid? PurchaseOrderId,
+    DateTime CreditDate, string Description, string? VendorCNRef,
+    decimal SubTotal, decimal TaxAmount, decimal TotalAmount,
+    decimal AppliedAmount, decimal AvailableCredit,
+    string Status, string Reason, string? Notes, DateTime CreatedAt);
+
+public record CreateCreditNoteRequest(
+    Guid VendorId, DateTime CreditDate, string Description,
+    decimal SubTotal, decimal TaxAmount = 0,
+    string Reason = "Other", Guid? APInvoiceId = null,
+    Guid? PurchaseOrderId = null, string? VendorCNRef = null, string? Notes = null);
+
+// ── PO / Invoice workflow action DTOs ────────────────────────────────────────
+public record SubmitForApprovalRequest(string SubmittedBy);
+public record WorkflowOutcomeRequest(string? Reason = null);

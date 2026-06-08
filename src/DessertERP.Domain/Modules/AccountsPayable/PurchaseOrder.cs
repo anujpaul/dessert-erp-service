@@ -3,7 +3,7 @@ using DessertERP.Domain.Common;
 namespace DessertERP.Domain.Modules.AccountsPayable;
 
 /// <summary>Lifecycle status — tracks physical receipt progress.</summary>
-public enum PurchaseOrderStatus { Draft, Sent, PartiallyReceived, FullyReceived, Closed, Cancelled }
+public enum PurchaseOrderStatus { Draft, PendingApproval, Sent, PartiallyReceived, FullyReceived, Closed, Cancelled }
 
 /// <summary>Invoice status — independent of receive status (a PO can be partially invoiced and still receive more goods).</summary>
 public enum POInvoiceStatus { NotInvoiced, PartiallyInvoiced, FullyInvoiced }
@@ -25,6 +25,10 @@ public class PurchaseOrder : BaseEntity
 
     /// <summary>Amount invoiced to date (cumulative across all AP invoices linked to this PO).</summary>
     public decimal InvoicedAmount { get; private set; }
+
+    // Workflow linkage
+    public Guid?  WorkflowInstanceId { get; private set; }
+    public string? RejectionReason   { get; private set; }
 
     // Export tracking
     public bool      IsExported { get; private set; }
@@ -129,8 +133,43 @@ public class PurchaseOrder : BaseEntity
         SetUpdated();
     }
 
+    /// <summary>
+    /// Submit the PO for workflow approval.
+    /// The service layer creates a WorkflowInstance and then calls this.
+    /// </summary>
+    public void SubmitForApproval(Guid workflowInstanceId)
+    {
+        if (Status != PurchaseOrderStatus.Draft)
+            throw new InvalidOperationException("Only a Draft PO can be submitted for approval.");
+        if (!_lines.Any())
+            throw new InvalidOperationException("Cannot submit a PO with no lines.");
+        Status             = PurchaseOrderStatus.PendingApproval;
+        WorkflowInstanceId = workflowInstanceId;
+        SetUpdated();
+    }
+
+    /// <summary>Called by the workflow engine after all steps are approved — activates the PO.</summary>
+    public void WorkflowApproved()
+    {
+        if (Status != PurchaseOrderStatus.PendingApproval)
+            throw new InvalidOperationException("PO is not pending approval.");
+        Status = PurchaseOrderStatus.Sent;
+        SetUpdated();
+    }
+
+    /// <summary>Called by the workflow engine when a step is rejected — returns PO to Draft.</summary>
+    public void WorkflowRejected(string reason)
+    {
+        if (Status != PurchaseOrderStatus.PendingApproval)
+            throw new InvalidOperationException("PO is not pending approval.");
+        Status          = PurchaseOrderStatus.Draft;   // allow correction & resubmission
+        RejectionReason = reason;
+        SetUpdated();
+    }
+
     public void Send()
     {
+        // Direct-send path: for orgs without PO approval workflow configured
         if (Status != PurchaseOrderStatus.Draft)
             throw new InvalidOperationException("Only a Draft PO can be sent.");
         if (!_lines.Any())

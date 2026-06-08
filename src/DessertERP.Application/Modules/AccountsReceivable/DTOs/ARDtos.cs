@@ -69,14 +69,16 @@ public record SalesOrderLineDto(Guid Id, Guid ProductVariantId, string Sku,
 public record SalesOrderSummaryDto(Guid Id, string OrderNumber, Guid CustomerId,
     string CustomerName, DateTime OrderDate, DateTime? RequestedShipDate,
     string CustomerRef, string Status, decimal GrandTotal, int LineCount, DateTime CreatedAt,
-    bool IsExported, DateTime? ExportedAt);
+    bool IsExported, DateTime? ExportedAt, Guid? WorkflowInstanceId, string? RejectionReason);
 
 public record SalesOrderDto(Guid Id, string OrderNumber, Guid CustomerId, string CustomerName,
     DateTime OrderDate, DateTime? RequestedShipDate, DateTime? ActualShipDate,
     string Description, string CustomerRef, string Currency, string Status,
     decimal SubTotal, decimal TaxTotal, decimal DiscountTotal, decimal GrandTotal,
     Guid? ARInvoiceId, DateTime CreatedAt, IReadOnlyList<SalesOrderLineDto> Lines,
-    bool IsExported, DateTime? ExportedAt);
+    bool IsExported, DateTime? ExportedAt,
+    Guid? WorkflowInstanceId, string? RejectionReason,
+    DateTime? DeliveredAt, string? DeliveryReference);
 
 public record CreateSalesOrderRequest(
     Guid CustomerId, DateTime OrderDate, string Description,
@@ -97,7 +99,8 @@ public record ARInvoiceDto(Guid Id, string InvoiceNumber, Guid CustomerId,
     DateTime InvoiceDate, DateTime DueDate, string Description,
     decimal SubTotal, decimal TaxAmount, decimal DiscountAmount, decimal TotalAmount,
     decimal PaidAmount, decimal OutstandingAmount, string Status,
-    int DaysOutstanding, DateTime CreatedAt);
+    int DaysOutstanding, DateTime CreatedAt,
+    Guid? WorkflowInstanceId = null, bool IsSubmittedForApproval = false);
 
 public record CreateARInvoiceRequest(
     Guid CustomerId, DateTime InvoiceDate, DateTime DueDate,
@@ -118,3 +121,85 @@ public record CreateARPaymentRequest(
 public record ARAgingDto(string CustomerNumber, string CustomerName,
     decimal Current, decimal Days1_30, decimal Days31_60, decimal Days61_90,
     decimal Over90, decimal Total);
+
+// ── Sales Quotations ──────────────────────────────────────────────────────────
+public record QuotationLineDto(
+    Guid Id, int LineNumber, Guid ProductVariantId, string Sku,
+    string ProductName, string? VariantDescription, string UnitOfMeasure,
+    decimal Quantity, decimal UnitPrice, decimal DiscountPct, decimal TaxRate,
+    decimal LineSubTotal, decimal DiscountAmount, decimal TaxAmount, decimal LineTotal);
+
+public record QuotationSummaryDto(
+    Guid Id, string QuotationNumber, Guid CustomerId, string CustomerName,
+    DateTime QuotationDate, DateTime ValidUntil, string CustomerRef,
+    string Status, decimal GrandTotal, int LineCount,
+    Guid? WorkflowInstanceId, Guid? ConvertedToSOId, DateTime CreatedAt);
+
+public record QuotationDto(
+    Guid Id, string QuotationNumber, Guid CustomerId, string CustomerName,
+    DateTime QuotationDate, DateTime ValidUntil, string Description,
+    string CustomerRef, string Currency, string Status,
+    decimal SubTotal, decimal TaxTotal, decimal DiscountTotal, decimal GrandTotal,
+    Guid? WorkflowInstanceId, string? RejectionReason,
+    Guid? ConvertedToSOId, DateTime? ConvertedAt, string? Notes, DateTime CreatedAt,
+    IReadOnlyList<QuotationLineDto> Lines);
+
+public record CreateQuotationRequest(
+    Guid CustomerId, DateTime QuotationDate, DateTime ValidUntil,
+    string Description, string CustomerRef = "", string Currency = "USD",
+    string? Notes = null);
+
+public record AddQuotationLineRequest(
+    Guid ProductVariantId, decimal Quantity,
+    decimal? OverrideUnitPrice = null, decimal DiscountPct = 0);
+
+public record ConvertQuotationToSORequest(
+    DateTime? OrderDate = null, string? Description = null);
+
+// ── SO Workflow ───────────────────────────────────────────────────────────────
+public record SubmitSOForApprovalRequest(string SubmittedBy);
+public record SOWorkflowOutcomeRequest(string? Reason = null);
+
+// ── AR Invoice Workflow ───────────────────────────────────────────────────────
+public record SubmitARInvoiceForApprovalRequest(string SubmittedBy);
+
+// ── Delivery Confirmation ─────────────────────────────────────────────────────
+public record ConfirmDeliveryRequest(DateTime? DeliveredAt = null, string? Reference = null);
+
+// ── Customer Credit Notes ─────────────────────────────────────────────────────
+public record ARCreditNoteSummaryDto(
+    Guid Id, string CreditNoteNumber, Guid CustomerId, string CustomerName,
+    Guid? ARInvoiceId, DateTime CreditDate, string Reason,
+    decimal TotalAmount, decimal AvailableCredit, string Status, DateTime CreatedAt);
+
+public record ARCreditNoteDto(
+    Guid Id, string CreditNoteNumber, Guid CustomerId, string CustomerName,
+    Guid? ARInvoiceId, string? InvoiceNumber, Guid? SalesOrderId, string? SalesOrderNumber,
+    DateTime CreditDate, string Description, string? CustomerRef,
+    decimal SubTotal, decimal TaxAmount, decimal TotalAmount,
+    decimal AppliedAmount, decimal AvailableCredit,
+    string Status, string Reason, string? Notes,
+    Guid? WorkflowInstanceId, DateTime CreatedAt);
+
+public record CreateARCreditNoteRequest(
+    Guid CustomerId, DateTime CreditDate, string Description,
+    decimal SubTotal, decimal TaxAmount = 0,
+    string Reason = "Other",
+    Guid? ARInvoiceId = null, Guid? SalesOrderId = null,
+    string? CustomerRef = null, string? Notes = null);
+
+public record ApplyCreditNoteRequest(Guid ARInvoiceId, decimal Amount);
+public record SubmitCreditNoteForApprovalRequest(string SubmittedBy);
+
+// ── Dunning Records ───────────────────────────────────────────────────────────
+public record DunningRecordDto(
+    Guid Id, string DunningNumber, Guid CustomerId, string CustomerName,
+    Guid ARInvoiceId, string InvoiceNumber,
+    string Level, string Status,
+    DateTime SentDate, DateTime FollowUpDate, decimal OutstandingAmount,
+    string? AssignedTo, string? Notes,
+    DateTime? ResolvedAt, string? ResolutionNotes, DateTime CreatedAt);
+
+public record CreateDunningRequest(
+    Guid CustomerId, Guid ARInvoiceId, string Level,
+    DateTime? FollowUpDate = null, string? AssignedTo = null, string? Notes = null);

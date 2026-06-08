@@ -56,6 +56,45 @@ public interface IAccountsPayableService
     // Reports
     Task<IEnumerable<APAgingDto>> GetAgingReportAsync(CancellationToken ct = default);
     Task<VendorLedgerDto> GetVendorLedgerAsync(Guid vendorId, CancellationToken ct = default);
+
+    // Purchase Requisitions
+    Task<IEnumerable<PRSummaryDto>> GetRequisitionsAsync(string? status = null, CancellationToken ct = default);
+    Task<PRDto?> GetRequisitionAsync(Guid id, CancellationToken ct = default);
+    Task<PRDto> CreateRequisitionAsync(CreatePRRequest req, CancellationToken ct = default);
+    Task<PRDto> AddPRLineAsync(Guid prId, AddPRLineRequest req, CancellationToken ct = default);
+    Task RemovePRLineAsync(Guid prId, Guid lineId, CancellationToken ct = default);
+    Task<PRDto> SubmitRequisitionAsync(Guid id, CancellationToken ct = default);
+    Task<PRDto> ApproveRequisitionAsync(Guid id, string approvedBy, CancellationToken ct = default);
+    Task<PRDto> RejectRequisitionAsync(Guid id, string rejectedBy, string reason, CancellationToken ct = default);
+    Task<PurchaseOrderDto> ConvertRequisitionToPOAsync(Guid prId, ConvertPRToPORequest req, CancellationToken ct = default);
+    Task CancelRequisitionAsync(Guid id, CancellationToken ct = default);
+
+    // PO Workflow
+    Task SubmitPOForApprovalAsync(Guid poId, string submittedBy, CancellationToken ct = default);
+    Task POWorkflowApprovedAsync(Guid workflowInstanceId, CancellationToken ct = default);
+    Task POWorkflowRejectedAsync(Guid workflowInstanceId, string reason, CancellationToken ct = default);
+
+    // Invoice Workflow
+    Task SubmitInvoiceForApprovalAsync(Guid invoiceId, string submittedBy, CancellationToken ct = default);
+    Task InvoiceWorkflowApprovedAsync(Guid workflowInstanceId, CancellationToken ct = default);
+    Task InvoiceWorkflowRejectedAsync(Guid workflowInstanceId, CancellationToken ct = default);
+
+    // Payment Proposals
+    Task<IEnumerable<PaymentProposalSummaryDto>> GetPaymentProposalsAsync(CancellationToken ct = default);
+    Task<PaymentProposalDto?> GetPaymentProposalAsync(Guid id, CancellationToken ct = default);
+    Task<PaymentProposalDto> CreatePaymentProposalAsync(CreatePaymentProposalRequest req, CancellationToken ct = default);
+    Task<PaymentProposalDto> AddProposalLineAsync(Guid proposalId, Guid invoiceId, CancellationToken ct = default);
+    Task RemoveProposalLineAsync(Guid proposalId, Guid lineId, CancellationToken ct = default);
+    Task<PaymentProposalDto> ApprovePaymentProposalAsync(Guid id, CancellationToken ct = default);
+    Task<PaymentProposalDto> ProcessPaymentProposalAsync(Guid id, string processedBy, CancellationToken ct = default);
+    Task CancelPaymentProposalAsync(Guid id, CancellationToken ct = default);
+
+    // Vendor Credit Notes
+    Task<IEnumerable<CreditNoteDto>> GetCreditNotesAsync(Guid? vendorId = null, CancellationToken ct = default);
+    Task<CreditNoteDto> CreateCreditNoteAsync(CreateCreditNoteRequest req, CancellationToken ct = default);
+    Task<CreditNoteDto> PostCreditNoteAsync(Guid id, CancellationToken ct = default);
+    Task<CreditNoteDto> ApplyCreditNoteAsync(Guid id, Guid invoiceId, decimal amount, CancellationToken ct = default);
+    Task VoidCreditNoteAsync(Guid id, CancellationToken ct = default);
 }
 
 public class AccountsPayableService : IAccountsPayableService
@@ -728,5 +767,402 @@ public class AccountsPayableService : IAccountsPayableService
             i.LinkedPrepaymentInvoiceId, i.LinkedPrepaymentInvoice?.InvoiceNumber,
             (int)(DateTime.UtcNow - i.InvoiceDate).TotalDays, i.CreatedAt);
 
+    // ── Purchase Requisitions ─────────────────────────────────────────────────
 
+    public async Task<IEnumerable<PRSummaryDto>> GetRequisitionsAsync(
+        string? status = null, CancellationToken ct = default)
+    {
+        var query = _db.PurchaseRequisitions.Include(r => r.Lines).AsQueryable();
+        if (!string.IsNullOrEmpty(status) && Enum.TryParse<PRStatus>(status, out var s))
+            query = query.Where(r => r.Status == s);
+        var list = await query.OrderByDescending(r => r.CreatedAt).ToListAsync(ct);
+        return list.Select(r => new PRSummaryDto(
+            r.Id, r.RequisitionNumber, r.RequestedBy, r.DepartmentCode,
+            r.NeededByDate, r.Status.ToString(), r.TotalEstimatedCost,
+            r.Lines.Count, r.WorkflowInstanceId, r.ConvertedToPOId, r.CreatedAt));
+    }
+
+    public async Task<PRDto?> GetRequisitionAsync(Guid id, CancellationToken ct = default)
+    {
+        var r = await _db.PurchaseRequisitions.Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
+        return r is null ? null : ToPRDto(r);
+    }
+
+    public async Task<PRDto> CreateRequisitionAsync(CreatePRRequest req, CancellationToken ct = default)
+    {
+        var count = await _db.PurchaseRequisitions.CountAsync(ct) + 1;
+        var pr = new PurchaseRequisition(_org.OrganizationId,
+            $"PR-{req.NeededByDate:yyyy}-{count:D5}", req.RequestedBy, req.NeededByDate,
+            req.DepartmentCode, req.CostCenterCode, req.Notes);
+
+        if (req.Lines?.Any() == true)
+        {
+            foreach (var l in req.Lines)
+                pr.AddLine(l.ProductId, l.Description, l.Quantity, l.UnitOfMeasure,
+                    l.EstimatedUnitCost, l.SuggestedVendorId, l.GlAccountCode);
+        }
+
+        _db.PurchaseRequisitions.Add(pr);
+        await _db.SaveChangesAsync(ct);
+        return ToPRDto(pr);
+    }
+
+    public async Task<PRDto> AddPRLineAsync(Guid prId, AddPRLineRequest req, CancellationToken ct = default)
+    {
+        var pr = await _db.PurchaseRequisitions.Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == prId, ct)
+            ?? throw new InvalidOperationException("Requisition not found.");
+        pr.AddLine(req.ProductId, req.Description, req.Quantity, req.UnitOfMeasure,
+            req.EstimatedUnitCost, req.SuggestedVendorId, req.GlAccountCode);
+        await _db.SaveChangesAsync(ct);
+        return ToPRDto(pr);
+    }
+
+    public async Task RemovePRLineAsync(Guid prId, Guid lineId, CancellationToken ct = default)
+    {
+        var pr = await _db.PurchaseRequisitions.Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == prId, ct)
+            ?? throw new InvalidOperationException("Requisition not found.");
+        pr.RemoveLine(lineId);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<PRDto> SubmitRequisitionAsync(Guid id, CancellationToken ct = default)
+    {
+        var pr = await _db.PurchaseRequisitions.Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == id, ct)
+            ?? throw new InvalidOperationException("Requisition not found.");
+        pr.Submit();
+        await _db.SaveChangesAsync(ct);
+        return ToPRDto(pr);
+    }
+
+    public async Task<PRDto> ApproveRequisitionAsync(Guid id, string approvedBy, CancellationToken ct = default)
+    {
+        var pr = await _db.PurchaseRequisitions.Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == id, ct)
+            ?? throw new InvalidOperationException("Requisition not found.");
+        // Create a simple workflow instance for tracking
+        var wi = new DessertERP.Domain.Modules.Workflow.WorkflowInstance(
+            _org.OrganizationId, DessertERP.Domain.Modules.Workflow.WorkflowDocumentType.PurchaseOrder,
+            id, pr.RequisitionNumber, pr.TotalEstimatedCost, approvedBy);
+        _db.WorkflowInstances.Add(wi);
+        await _db.SaveChangesAsync(ct);
+        pr.WorkflowApprove(wi.Id);
+        await _db.SaveChangesAsync(ct);
+        return ToPRDto(pr);
+    }
+
+    public async Task<PRDto> RejectRequisitionAsync(Guid id, string rejectedBy, string reason, CancellationToken ct = default)
+    {
+        var pr = await _db.PurchaseRequisitions.Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == id, ct)
+            ?? throw new InvalidOperationException("Requisition not found.");
+        var wi = new DessertERP.Domain.Modules.Workflow.WorkflowInstance(
+            _org.OrganizationId, DessertERP.Domain.Modules.Workflow.WorkflowDocumentType.PurchaseOrder,
+            id, pr.RequisitionNumber, pr.TotalEstimatedCost, rejectedBy);
+        _db.WorkflowInstances.Add(wi);
+        await _db.SaveChangesAsync(ct);
+        pr.WorkflowReject(wi.Id, reason);
+        await _db.SaveChangesAsync(ct);
+        return ToPRDto(pr);
+    }
+
+    public async Task<PurchaseOrderDto> ConvertRequisitionToPOAsync(Guid prId, ConvertPRToPORequest req, CancellationToken ct = default)
+    {
+        var pr = await _db.PurchaseRequisitions.Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == prId, ct)
+            ?? throw new InvalidOperationException("Requisition not found.");
+
+        if (pr.Status != PRStatus.Approved)
+            throw new InvalidOperationException("Only Approved requisitions can be converted to a PO.");
+
+        var count = await _db.PurchaseOrders.CountAsync(ct) + 1;
+        var po = new PurchaseOrder(_org.OrganizationId, $"PO-{req.OrderDate:yyyy}-{count:D5}",
+            req.VendorId, req.OrderDate,
+            $"Converted from {pr.RequisitionNumber}", req.Currency ?? "USD", req.ExpectedDate);
+
+        // Add lines from the PR
+        foreach (var prl in pr.Lines)
+        {
+            if (req.ProductVariantIds?.TryGetValue(prl.Id, out var variantId) == true && variantId != Guid.Empty)
+            {
+                var line = po.AddLine(variantId, prl.GlAccountCode ?? prl.Description,
+                    prl.Description, prl.UnitOfMeasure, prl.Quantity, prl.EstimatedUnitCost);
+                _db.PurchaseOrderLines.Add(line);
+            }
+        }
+
+        _db.PurchaseOrders.Add(po);
+        pr.MarkConverted(po.Id);
+        await _db.SaveChangesAsync(ct);
+        return (await GetPurchaseOrderAsync(po.Id, ct))!;
+    }
+
+    public async Task CancelRequisitionAsync(Guid id, CancellationToken ct = default)
+    {
+        var pr = await _db.PurchaseRequisitions.Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == id, ct)
+            ?? throw new InvalidOperationException("Requisition not found.");
+        pr.Cancel();
+        await _db.SaveChangesAsync(ct);
+    }
+
+    // ── PO Workflow ───────────────────────────────────────────────────────────
+
+    public async Task SubmitPOForApprovalAsync(Guid poId, string submittedBy, CancellationToken ct = default)
+    {
+        var po = await LoadPOWithLines(poId, ct);
+        var wi = new DessertERP.Domain.Modules.Workflow.WorkflowInstance(
+            _org.OrganizationId, DessertERP.Domain.Modules.Workflow.WorkflowDocumentType.PurchaseOrder,
+            poId, po.PONumber, po.GrandTotal, submittedBy);
+        _db.WorkflowInstances.Add(wi);
+        await _db.SaveChangesAsync(ct);
+        po.SubmitForApproval(wi.Id);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task POWorkflowApprovedAsync(Guid workflowInstanceId, CancellationToken ct = default)
+    {
+        var po = await _db.PurchaseOrders.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(o => o.WorkflowInstanceId == workflowInstanceId, ct)
+            ?? throw new InvalidOperationException("No PO linked to this workflow instance.");
+        po.WorkflowApproved();
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task POWorkflowRejectedAsync(Guid workflowInstanceId, string reason, CancellationToken ct = default)
+    {
+        var po = await _db.PurchaseOrders.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(o => o.WorkflowInstanceId == workflowInstanceId, ct)
+            ?? throw new InvalidOperationException("No PO linked to this workflow instance.");
+        po.WorkflowRejected(reason);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    // ── Invoice Workflow ──────────────────────────────────────────────────────
+
+    public async Task SubmitInvoiceForApprovalAsync(Guid invoiceId, string submittedBy, CancellationToken ct = default)
+    {
+        var inv = await _db.APInvoices
+            .FirstOrDefaultAsync(i => i.Id == invoiceId && !i.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Invoice not found.");
+        var wi = new DessertERP.Domain.Modules.Workflow.WorkflowInstance(
+            _org.OrganizationId, DessertERP.Domain.Modules.Workflow.WorkflowDocumentType.APInvoice,
+            invoiceId, inv.InvoiceNumber, inv.TotalAmount, submittedBy);
+        _db.WorkflowInstances.Add(wi);
+        await _db.SaveChangesAsync(ct);
+        inv.SubmitForApproval(wi.Id);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task InvoiceWorkflowApprovedAsync(Guid workflowInstanceId, CancellationToken ct = default)
+    {
+        var inv = await _db.APInvoices.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(i => i.WorkflowInstanceId == workflowInstanceId, ct)
+            ?? throw new InvalidOperationException("No invoice linked to this workflow instance.");
+        inv.WorkflowApproved();
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task InvoiceWorkflowRejectedAsync(Guid workflowInstanceId, CancellationToken ct = default)
+    {
+        var inv = await _db.APInvoices.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(i => i.WorkflowInstanceId == workflowInstanceId, ct)
+            ?? throw new InvalidOperationException("No invoice linked to this workflow instance.");
+        inv.WorkflowRejected();
+        await _db.SaveChangesAsync(ct);
+    }
+
+    // ── Payment Proposals ─────────────────────────────────────────────────────
+
+    public async Task<IEnumerable<PaymentProposalSummaryDto>> GetPaymentProposalsAsync(CancellationToken ct = default)
+    {
+        var list = await _db.PaymentProposals.Include(p => p.Lines)
+            .OrderByDescending(p => p.ProposalDate).ToListAsync(ct);
+        return list.Select(p => new PaymentProposalSummaryDto(
+            p.Id, p.ProposalNumber, p.ProposalDate, p.PaymentDate,
+            p.PaymentMethod, p.Status.ToString(), p.TotalAmount,
+            p.Lines.Count, p.ProcessedAt, p.ProcessedBy, p.CreatedAt));
+    }
+
+    public async Task<PaymentProposalDto?> GetPaymentProposalAsync(Guid id, CancellationToken ct = default)
+    {
+        var p = await _db.PaymentProposals.Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
+        return p is null ? null : ToProposalDto(p);
+    }
+
+    public async Task<PaymentProposalDto> CreatePaymentProposalAsync(CreatePaymentProposalRequest req, CancellationToken ct = default)
+    {
+        var count = await _db.PaymentProposals.CountAsync(ct) + 1;
+        var proposal = new PaymentProposal(_org.OrganizationId,
+            $"PAY-{req.ProposalDate:yyyy}-{count:D5}",
+            req.ProposalDate, req.PaymentDate, req.PaymentMethod, req.BankAccount, req.Notes);
+        _db.PaymentProposals.Add(proposal);
+        await _db.SaveChangesAsync(ct);
+        return ToProposalDto(proposal);
+    }
+
+    public async Task<PaymentProposalDto> AddProposalLineAsync(Guid proposalId, Guid invoiceId, CancellationToken ct = default)
+    {
+        var proposal = await _db.PaymentProposals.Include(p => p.Lines)
+            .FirstOrDefaultAsync(p => p.Id == proposalId, ct)
+            ?? throw new InvalidOperationException("Proposal not found.");
+        var inv = await _db.APInvoices.Include(i => i.Vendor)
+            .FirstOrDefaultAsync(i => i.Id == invoiceId && !i.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Invoice not found.");
+
+        var outstanding = inv.TotalAmount - inv.PaidAmount - inv.PrepaymentApplied;
+        var line = proposal.AddLine(inv.Id, inv.InvoiceNumber, inv.VendorId,
+            inv.Vendor?.Name ?? string.Empty, outstanding, inv.DueDate);
+        _db.PaymentProposalLines.Add(line);
+        await _db.SaveChangesAsync(ct);
+        return ToProposalDto(proposal);
+    }
+
+    public async Task RemoveProposalLineAsync(Guid proposalId, Guid lineId, CancellationToken ct = default)
+    {
+        var proposal = await _db.PaymentProposals.Include(p => p.Lines)
+            .FirstOrDefaultAsync(p => p.Id == proposalId, ct)
+            ?? throw new InvalidOperationException("Proposal not found.");
+        proposal.RemoveLine(lineId);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<PaymentProposalDto> ApprovePaymentProposalAsync(Guid id, CancellationToken ct = default)
+    {
+        var proposal = await _db.PaymentProposals.Include(p => p.Lines)
+            .FirstOrDefaultAsync(p => p.Id == id, ct)
+            ?? throw new InvalidOperationException("Proposal not found.");
+        proposal.Approve();
+        await _db.SaveChangesAsync(ct);
+        return ToProposalDto(proposal);
+    }
+
+    public async Task<PaymentProposalDto> ProcessPaymentProposalAsync(Guid id, string processedBy, CancellationToken ct = default)
+    {
+        var proposal = await _db.PaymentProposals.Include(p => p.Lines)
+            .FirstOrDefaultAsync(p => p.Id == id, ct)
+            ?? throw new InvalidOperationException("Proposal not found.");
+
+        var payCount = await _db.APPayments.CountAsync(ct);
+        foreach (var line in proposal.Lines.Where(l => l.APPaymentId is null))
+        {
+            payCount++;
+            var inv = await _db.APInvoices.FindAsync(new object[] { line.APInvoiceId }, ct)
+                ?? throw new InvalidOperationException($"Invoice {line.APInvoiceId} not found.");
+
+            var payment = new APPayment(_org.OrganizationId, $"PMT-{DateTime.UtcNow:yyyy}-{payCount:D6}",
+                line.VendorId, line.APInvoiceId, proposal.PaymentDate, line.ProposedAmount,
+                proposal.PaymentMethod, proposal.BankAccount);
+            _db.APPayments.Add(payment);
+            await _db.SaveChangesAsync(ct);
+
+            inv.ApplyPayment(line.ProposedAmount);
+            line.SetPayment(payment.Id);
+        }
+
+        proposal.MarkProcessed(processedBy);
+        await _db.SaveChangesAsync(ct);
+        return ToProposalDto(proposal);
+    }
+
+    public async Task CancelPaymentProposalAsync(Guid id, CancellationToken ct = default)
+    {
+        var proposal = await _db.PaymentProposals.Include(p => p.Lines)
+            .FirstOrDefaultAsync(p => p.Id == id, ct)
+            ?? throw new InvalidOperationException("Proposal not found.");
+        proposal.Cancel();
+        await _db.SaveChangesAsync(ct);
+    }
+
+    // ── Vendor Credit Notes ───────────────────────────────────────────────────
+
+    public async Task<IEnumerable<CreditNoteDto>> GetCreditNotesAsync(
+        Guid? vendorId = null, CancellationToken ct = default)
+    {
+        var query = _db.VendorCreditNotes.Include(c => c.Vendor).AsQueryable();
+        if (vendorId.HasValue) query = query.Where(c => c.VendorId == vendorId.Value);
+        var list = await query.OrderByDescending(c => c.CreditDate).ToListAsync(ct);
+        return list.Select(ToCreditNoteDto);
+    }
+
+    public async Task<CreditNoteDto> CreateCreditNoteAsync(CreateCreditNoteRequest req, CancellationToken ct = default)
+    {
+        var count = await _db.VendorCreditNotes.CountAsync(ct) + 1;
+        if (!Enum.TryParse<CreditNoteReason>(req.Reason, out var reason))
+            reason = CreditNoteReason.Other;
+        var cn = new VendorCreditNote(_org.OrganizationId, $"CN-{count:D6}",
+            req.VendorId, req.CreditDate, req.Description,
+            req.SubTotal, req.TaxAmount, reason,
+            req.APInvoiceId, req.PurchaseOrderId, req.VendorCNRef, req.Notes);
+        _db.VendorCreditNotes.Add(cn);
+        await _db.SaveChangesAsync(ct);
+        // Reload with vendor navigation populated
+        var saved = await _db.VendorCreditNotes.Include(c => c.Vendor)
+            .FirstAsync(c => c.Id == cn.Id, ct);
+        return ToCreditNoteDto(saved);
+    }
+
+    public async Task<CreditNoteDto> PostCreditNoteAsync(Guid id, CancellationToken ct = default)
+    {
+        var cn = await _db.VendorCreditNotes.Include(c => c.Vendor)
+            .FirstOrDefaultAsync(c => c.Id == id, ct)
+            ?? throw new InvalidOperationException("Credit note not found.");
+        cn.Post();
+        await _db.SaveChangesAsync(ct);
+        return ToCreditNoteDto(cn);
+    }
+
+    public async Task<CreditNoteDto> ApplyCreditNoteAsync(Guid id, Guid invoiceId, decimal amount, CancellationToken ct = default)
+    {
+        var cn = await _db.VendorCreditNotes.Include(c => c.Vendor)
+            .FirstOrDefaultAsync(c => c.Id == id, ct)
+            ?? throw new InvalidOperationException("Credit note not found.");
+        var inv = await _db.APInvoices.FindAsync(new object[] { invoiceId }, ct)
+            ?? throw new InvalidOperationException("Invoice not found.");
+
+        cn.ApplyCredit(amount);
+        inv.ApplyPayment(amount);  // credits reduce the invoice balance
+        await _db.SaveChangesAsync(ct);
+        return ToCreditNoteDto(cn);
+    }
+
+    public async Task VoidCreditNoteAsync(Guid id, CancellationToken ct = default)
+    {
+        var cn = await _db.VendorCreditNotes.Include(c => c.Vendor)
+            .FirstOrDefaultAsync(c => c.Id == id, ct)
+            ?? throw new InvalidOperationException("Credit note not found.");
+        cn.Void();
+        await _db.SaveChangesAsync(ct);
+    }
+
+    // ── P2P Mapping helpers ───────────────────────────────────────────────────
+
+    private static PRDto ToPRDto(PurchaseRequisition r) =>
+        new(r.Id, r.RequisitionNumber, r.RequestedBy, r.DepartmentCode, r.CostCenterCode,
+            r.NeededByDate, r.Status.ToString(), r.TotalEstimatedCost,
+            r.WorkflowInstanceId, r.ConvertedToPOId, r.RejectionReason, r.Notes, r.CreatedAt,
+            r.Lines.Select(l => new PRLineDto(
+                l.Id, l.LineNumber, l.ProductId, l.Description, l.Quantity,
+                l.UnitOfMeasure, l.EstimatedUnitCost, l.EstimatedTotalCost,
+                l.SuggestedVendorId, l.GlAccountCode, l.Notes)).ToList());
+
+    private static PaymentProposalDto ToProposalDto(PaymentProposal p) =>
+        new(p.Id, p.ProposalNumber, p.ProposalDate, p.PaymentDate,
+            p.PaymentMethod, p.BankAccount, p.Status.ToString(), p.TotalAmount,
+            p.ProcessedAt, p.ProcessedBy, p.Notes, p.CreatedAt,
+            p.Lines.Select(l => new PaymentProposalLineDto(
+                l.Id, l.APInvoiceId, l.InvoiceNumber,
+                l.VendorId, l.VendorName, l.ProposedAmount, l.InvoiceDueDate,
+                l.APPaymentId)).ToList());
+
+    private static CreditNoteDto ToCreditNoteDto(VendorCreditNote c) =>
+        new(c.Id, c.CreditNoteNumber, c.VendorId, c.Vendor?.Name ?? string.Empty,
+            c.APInvoiceId, c.PurchaseOrderId, c.CreditDate, c.Description,
+            c.VendorCNRef, c.SubTotal, c.TaxAmount, c.TotalAmount,
+            c.AppliedAmount, c.AvailableCredit,
+            c.Status.ToString(), c.Reason.ToString(), c.Notes, c.CreatedAt);
 }

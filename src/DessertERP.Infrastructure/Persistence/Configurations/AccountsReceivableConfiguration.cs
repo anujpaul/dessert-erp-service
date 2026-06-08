@@ -45,6 +45,9 @@ public class SalesOrderConfiguration : IEntityTypeConfiguration<SalesOrder>
         b.Property(e => e.TaxTotal).HasColumnType("numeric(18,4)");
         b.Property(e => e.DiscountTotal).HasColumnType("numeric(18,4)");
         b.Property(e => e.GrandTotal).HasColumnType("numeric(18,4)");
+        // Workflow + delivery tracking columns (nullable)
+        b.Property(e => e.RejectionReason).HasMaxLength(500);
+        b.Property(e => e.DeliveryReference).HasMaxLength(200);
         b.HasOne(e => e.Customer).WithMany().HasForeignKey(e => e.CustomerId);
         b.HasMany(e => e.Lines).WithOne(l => l.SalesOrder)
             .HasForeignKey(l => l.SalesOrderId).OnDelete(DeleteBehavior.Cascade);
@@ -96,6 +99,7 @@ public class ARInvoiceConfiguration : IEntityTypeConfiguration<ARInvoice>
         b.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
         b.Ignore(e => e.OutstandingAmount);
         b.Ignore(e => e.DaysOutstanding);
+        b.Ignore(e => e.IsSubmittedForApproval);   // computed property
         b.HasOne(e => e.Customer).WithMany().HasForeignKey(e => e.CustomerId);
         b.HasOne(e => e.SalesOrder).WithMany().HasForeignKey(e => e.SalesOrderId);
         b.HasIndex(e => new { e.OrganizationId, e.InvoiceNumber }).IsUnique();
@@ -159,5 +163,108 @@ public class CustomerContactConfiguration : IEntityTypeConfiguration<CustomerCon
         b.HasOne(e => e.Customer).WithMany(c => c.Contacts)
             .HasForeignKey(e => e.CustomerId).OnDelete(DeleteBehavior.Cascade);
         b.HasQueryFilter(e => !e.IsDeleted);
+    }
+}
+
+// ── S2C: Sales Quotations ─────────────────────────────────────────────────────
+
+public class SalesQuotationConfiguration : IEntityTypeConfiguration<SalesQuotation>
+{
+    public void Configure(EntityTypeBuilder<SalesQuotation> b)
+    {
+        b.ToTable("sales_quotations");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.OrganizationId).IsRequired();
+        b.Property(e => e.QuotationNumber).HasMaxLength(30).IsRequired();
+        b.Property(e => e.Description).HasMaxLength(500);
+        b.Property(e => e.CustomerRef).HasMaxLength(100);
+        b.Property(e => e.Currency).HasMaxLength(3);
+        b.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+        b.Property(e => e.SubTotal).HasColumnType("numeric(18,4)");
+        b.Property(e => e.TaxTotal).HasColumnType("numeric(18,4)");
+        b.Property(e => e.DiscountTotal).HasColumnType("numeric(18,4)");
+        b.Property(e => e.GrandTotal).HasColumnType("numeric(18,4)");
+        b.Property(e => e.RejectionReason).HasMaxLength(500);
+        b.Property(e => e.Notes).HasMaxLength(2000);
+        b.HasOne(e => e.Customer).WithMany().HasForeignKey(e => e.CustomerId);
+        b.HasMany(e => e.Lines).WithOne(l => l.Quotation)
+            .HasForeignKey(l => l.QuotationId).OnDelete(DeleteBehavior.Cascade);
+        b.HasIndex(e => new { e.OrganizationId, e.QuotationNumber }).IsUnique();
+        // Query filter applied in AppDbContext.OnModelCreating
+    }
+}
+
+public class SalesQuotationLineConfiguration : IEntityTypeConfiguration<SalesQuotationLine>
+{
+    public void Configure(EntityTypeBuilder<SalesQuotationLine> b)
+    {
+        b.ToTable("sales_quotation_lines");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.Sku).HasMaxLength(60);
+        b.Property(e => e.ProductName).HasMaxLength(200);
+        b.Property(e => e.VariantDescription).HasMaxLength(200);
+        b.Property(e => e.UnitOfMeasure).HasMaxLength(20);
+        b.Property(e => e.Quantity).HasColumnType("numeric(18,4)");
+        b.Property(e => e.UnitPrice).HasColumnType("numeric(18,4)");
+        b.Property(e => e.DiscountPct).HasColumnType("numeric(8,4)");
+        b.Property(e => e.TaxRate).HasColumnType("numeric(8,4)");
+        // Computed properties — not persisted
+        b.Ignore(e => e.LineSubTotal);
+        b.Ignore(e => e.DiscountAmount);
+        b.Ignore(e => e.TaxableAmount);
+        b.Ignore(e => e.TaxAmount);
+        b.Ignore(e => e.LineTotal);
+        b.HasQueryFilter(e => !e.IsDeleted);
+    }
+}
+
+// ── S2C: Customer Credit Notes ────────────────────────────────────────────────
+
+public class CustomerCreditNoteConfiguration : IEntityTypeConfiguration<CustomerCreditNote>
+{
+    public void Configure(EntityTypeBuilder<CustomerCreditNote> b)
+    {
+        b.ToTable("customer_credit_notes");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.OrganizationId).IsRequired();
+        b.Property(e => e.CreditNoteNumber).HasMaxLength(30).IsRequired();
+        b.Property(e => e.Description).HasMaxLength(500);
+        b.Property(e => e.CustomerRef).HasMaxLength(100);
+        b.Property(e => e.SubTotal).HasColumnType("numeric(18,4)");
+        b.Property(e => e.TaxAmount).HasColumnType("numeric(18,4)");
+        b.Property(e => e.TotalAmount).HasColumnType("numeric(18,4)");
+        b.Property(e => e.AppliedAmount).HasColumnType("numeric(18,4)");
+        b.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+        b.Property(e => e.Reason).HasConversion<string>().HasMaxLength(30);
+        b.Property(e => e.Notes).HasMaxLength(2000);
+        b.Ignore(e => e.AvailableCredit);   // computed
+        b.HasOne(e => e.Customer).WithMany().HasForeignKey(e => e.CustomerId);
+        b.HasOne(e => e.ARInvoice).WithMany().HasForeignKey(e => e.ARInvoiceId)
+            .OnDelete(DeleteBehavior.SetNull);
+        b.HasIndex(e => new { e.OrganizationId, e.CreditNoteNumber }).IsUnique();
+        // Query filter applied in AppDbContext.OnModelCreating
+    }
+}
+
+// ── S2C: Dunning Records ──────────────────────────────────────────────────────
+
+public class DunningRecordConfiguration : IEntityTypeConfiguration<DunningRecord>
+{
+    public void Configure(EntityTypeBuilder<DunningRecord> b)
+    {
+        b.ToTable("dunning_records");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.OrganizationId).IsRequired();
+        b.Property(e => e.DunningNumber).HasMaxLength(30).IsRequired();
+        b.Property(e => e.Level).HasConversion<string>().HasMaxLength(20);
+        b.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+        b.Property(e => e.OutstandingAmount).HasColumnType("numeric(18,4)");
+        b.Property(e => e.Notes).HasMaxLength(2000);
+        b.Property(e => e.AssignedTo).HasMaxLength(200);
+        b.Property(e => e.ResolutionNotes).HasMaxLength(2000);
+        b.HasOne(e => e.Customer).WithMany().HasForeignKey(e => e.CustomerId);
+        b.HasOne(e => e.ARInvoice).WithMany().HasForeignKey(e => e.ARInvoiceId);
+        b.HasIndex(e => new { e.OrganizationId, e.DunningNumber }).IsUnique();
+        // Query filter applied in AppDbContext.OnModelCreating
     }
 }

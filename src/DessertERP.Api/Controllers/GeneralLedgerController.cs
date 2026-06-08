@@ -145,4 +145,66 @@ public class GeneralLedgerController : ControllerBase
     [HttpGet("reports/trial-balance")]
     public async Task<IActionResult> GetTrialBalance([FromQuery] Guid fiscalPeriodId, CancellationToken ct)
         => Ok(await _svc.GetTrialBalanceAsync(fiscalPeriodId, ct));
+
+    // ── Currencies ────────────────────────────────────────────────────────────
+
+    [HttpGet("currencies")]
+    public async Task<IActionResult> GetCurrencies([FromQuery] bool activeOnly = false, CancellationToken ct = default)
+        => Ok(await _svc.GetCurrenciesAsync(activeOnly, ct));
+
+    [HttpGet("currencies/base")]
+    public async Task<IActionResult> GetBaseCurrency(CancellationToken ct)
+    {
+        var dto = await _svc.GetBaseCurrencyAsync(ct);
+        return dto is null ? NotFound() : Ok(dto);
+    }
+
+    [HttpGet("currencies/{id:guid}")]
+    public async Task<IActionResult> GetCurrency(Guid id, CancellationToken ct)
+    {
+        var dto = await _svc.GetCurrencyAsync(id, ct);
+        return dto is null ? NotFound() : Ok(dto);
+    }
+
+    [HttpPost("currencies")]
+    public async Task<IActionResult> CreateCurrency([FromBody] CreateCurrencyRequest req, CancellationToken ct)
+    {
+        try { return StatusCode(201, await _svc.CreateCurrencyAsync(req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPut("currencies/{id:guid}")]
+    public async Task<IActionResult> UpdateCurrency(Guid id, [FromBody] UpdateCurrencyRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.UpdateCurrencyAsync(id, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPatch("currencies/{id:guid}/exchange-rate")]
+    public async Task<IActionResult> UpdateExchangeRate(Guid id, [FromBody] UpdateExchangeRateRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.UpdateExchangeRateAsync(id, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("currencies/{id:guid}/set-base")]
+    public async Task<IActionResult> SetBaseCurrency(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.SetBaseCurrencyAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("currencies/{id:guid}/activate")]
+    public async Task<IActionResult> ActivateCurrency(Guid id, CancellationToken ct)
+    {
+        try { await _svc.ActivateCurrencyAsync(id, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("currencies/{id:guid}/deactivate")]
+    public async Task<IActionResult> DeactivateCurrency(Guid id, CancellationToken ct)
+    {
+        try { await _svc.DeactivateCurrencyAsync(id, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
 }

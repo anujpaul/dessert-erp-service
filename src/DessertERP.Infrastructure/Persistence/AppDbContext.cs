@@ -56,26 +56,37 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<Account>      Accounts      => Set<Account>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<JournalLine>  JournalLines  => Set<JournalLine>();
+    public DbSet<Currency>     Currencies    => Set<Currency>();
 
     // Accounts Receivable
-    public DbSet<Customer>        Customers        => Set<Customer>();
-    public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();
-    public DbSet<CustomerContact> CustomerContacts  => Set<CustomerContact>();
-    public DbSet<SalesOrder>      SalesOrders      => Set<SalesOrder>();
-    public DbSet<SalesOrderLine>  SalesOrderLines  => Set<SalesOrderLine>();
-    public DbSet<ARInvoice>       ARInvoices       => Set<ARInvoice>();
-    public DbSet<ARPayment>       ARPayments       => Set<ARPayment>();
+    public DbSet<Customer>           Customers           => Set<Customer>();
+    public DbSet<CustomerAddress>    CustomerAddresses   => Set<CustomerAddress>();
+    public DbSet<CustomerContact>    CustomerContacts    => Set<CustomerContact>();
+    public DbSet<SalesOrder>         SalesOrders         => Set<SalesOrder>();
+    public DbSet<SalesOrderLine>     SalesOrderLines     => Set<SalesOrderLine>();
+    public DbSet<ARInvoice>          ARInvoices          => Set<ARInvoice>();
+    public DbSet<ARPayment>          ARPayments          => Set<ARPayment>();
+    // S2C additions
+    public DbSet<SalesQuotation>     SalesQuotations     => Set<SalesQuotation>();
+    public DbSet<SalesQuotationLine> SalesQuotationLines => Set<SalesQuotationLine>();
+    public DbSet<CustomerCreditNote> CustomerCreditNotes => Set<CustomerCreditNote>();
+    public DbSet<DunningRecord>      DunningRecords      => Set<DunningRecord>();
 
     // Accounts Payable
     public DbSet<Vendor>                    Vendors                   => Set<Vendor>();
     public DbSet<VendorAddress>             VendorAddresses           => Set<VendorAddress>();
     public DbSet<VendorContact>             VendorContacts            => Set<VendorContact>();
+    public DbSet<PurchaseRequisition>       PurchaseRequisitions      => Set<PurchaseRequisition>();
+    public DbSet<PurchaseRequisitionLine>   PurchaseRequisitionLines  => Set<PurchaseRequisitionLine>();
     public DbSet<PurchaseOrder>             PurchaseOrders            => Set<PurchaseOrder>();
     public DbSet<PurchaseOrderLine>         PurchaseOrderLines        => Set<PurchaseOrderLine>();
     public DbSet<PurchaseOrderReceipt>      PurchaseOrderReceipts     => Set<PurchaseOrderReceipt>();
     public DbSet<PurchaseOrderReceiptLine>  PurchaseOrderReceiptLines => Set<PurchaseOrderReceiptLine>();
     public DbSet<APInvoice>                 APInvoices                => Set<APInvoice>();
     public DbSet<APPayment>                 APPayments                => Set<APPayment>();
+    public DbSet<VendorCreditNote>          VendorCreditNotes         => Set<VendorCreditNote>();
+    public DbSet<PaymentProposal>           PaymentProposals          => Set<PaymentProposal>();
+    public DbSet<PaymentProposalLine>       PaymentProposalLines      => Set<PaymentProposalLine>();
 
     // Retail
     public DbSet<RetailStore>        RetailStores        => Set<RetailStore>();
@@ -156,6 +167,8 @@ public class AppDbContext : DbContext, IAppDbContext
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<JournalEntry>()
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<Currency>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
 
         // AR
         modelBuilder.Entity<Customer>()
@@ -170,6 +183,14 @@ public class AppDbContext : DbContext, IAppDbContext
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<ARPayment>()
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<SalesQuotation>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<SalesQuotationLine>()
+            .HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<CustomerCreditNote>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<DunningRecord>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
 
         // AP
         modelBuilder.Entity<Vendor>()
@@ -178,12 +199,18 @@ public class AppDbContext : DbContext, IAppDbContext
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<VendorContact>()
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<PurchaseRequisition>()
+            .HasQueryFilter(e => _orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId);
         modelBuilder.Entity<PurchaseOrder>()
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<APInvoice>()
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<APPayment>()
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<VendorCreditNote>()
+            .HasQueryFilter(e => _orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId);
+        modelBuilder.Entity<PaymentProposal>()
+            .HasQueryFilter(e => _orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId);
 
         // Data Management — org-scoped, soft-delete
         modelBuilder.Entity<ImportJob>()

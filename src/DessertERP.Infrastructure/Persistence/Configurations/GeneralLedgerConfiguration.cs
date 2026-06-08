@@ -104,3 +104,26 @@ public class JournalLineConfiguration : IEntityTypeConfiguration<JournalLine>
         b.HasQueryFilter(e => !e.IsDeleted);
     }
 }
+
+public class CurrencyConfiguration : IEntityTypeConfiguration<Currency>
+{
+    public void Configure(EntityTypeBuilder<Currency> b)
+    {
+        b.ToTable("currencies");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.OrganizationId).IsRequired();
+        b.Property(e => e.Code).HasMaxLength(3).IsRequired();
+        b.Property(e => e.Name).HasMaxLength(100).IsRequired();
+        b.Property(e => e.Symbol).HasMaxLength(10).IsRequired();
+        b.Property(e => e.DecimalPlaces).IsRequired();
+        b.Property(e => e.ExchangeRate).HasColumnType("numeric(18,6)").IsRequired();
+        b.Property(e => e.IsBase).IsRequired();
+        b.Property(e => e.IsActive).IsRequired();
+        b.Property(e => e.NumericCode);
+        b.Property(e => e.Country).HasMaxLength(100);
+        b.Property(e => e.RateUpdatedAt);
+        // Unique per org: only one row per ISO code per organisation
+        b.HasIndex(e => new { e.OrganizationId, e.Code }).IsUnique();
+        // Query filter applied in AppDbContext.OnModelCreating
+    }
+}

@@ -14,6 +14,8 @@ using DessertERP.Application.Modules.ProductManagement.Services;
 using DessertERP.Application.Modules.InventoryManagement.Services;
 using DessertERP.Application.Modules.Workflow.Services;
 using DessertERP.Application.Modules.Expenses.Services;
+using DessertERP.Application.Modules.WarehouseManagement;
+using DessertERP.Infrastructure.Modules.WarehouseManagement;
 using DessertERP.Application.Modules.Marketing.Services;
 using DessertERP.Application.Modules.ProductManagement.Services;
 using DessertERP.Application.Modules.Retail.Services;
@@ -66,6 +68,7 @@ builder.Services.AddScoped<IProductManagementService, ProductManagementService>(
 builder.Services.AddScoped<IInventoryManagementService, InventoryManagementService>();
 builder.Services.AddScoped<IWorkflowService, WorkflowService>();
 builder.Services.AddScoped<IExpenseService, ExpenseService>();
+builder.Services.AddScoped<IWarehouseManagementService, WarehouseManagementService>();
 
 // ── Data Management ───────────────────────────────────────────────────────────
 builder.Services.AddScoped<IDataManagementService, DataManagementService>();

@@ -10,6 +10,7 @@ using DessertERP.Domain.Modules.Retail;
 using DessertERP.Domain.Modules.SystemAdmin;
 using DessertERP.Domain.Modules.Workflow;
 using DessertERP.Domain.Modules.Expenses;
+using DessertERP.Domain.Modules.WarehouseManagement;
 using Microsoft.EntityFrameworkCore;
 using PMProduct = DessertERP.Domain.Modules.ProductManagement.Product;
 
@@ -98,6 +99,16 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<ImportJobRow>   ImportJobRows   => Set<ImportJobRow>();
     public DbSet<ExportJobRow>   ExportJobRows   => Set<ExportJobRow>();
     public DbSet<BatchJobConfig> BatchJobConfigs => Set<BatchJobConfig>();
+
+    // Warehouse Management
+    public DbSet<Warehouse>         Warehouses         => Set<Warehouse>();
+    public DbSet<WarehouseLocation> WarehouseLocations => Set<WarehouseLocation>();
+    public DbSet<InboundOrder>      InboundOrders      => Set<InboundOrder>();
+    public DbSet<InboundOrderLine>  InboundOrderLines  => Set<InboundOrderLine>();
+    public DbSet<OutboundOrder>     OutboundOrders     => Set<OutboundOrder>();
+    public DbSet<OutboundOrderLine> OutboundOrderLines => Set<OutboundOrderLine>();
+    public DbSet<TransferOrder>     TransferOrders     => Set<TransferOrder>();
+    public DbSet<TransferOrderLine> TransferOrderLines => Set<TransferOrderLine>();
 
     // System Admin
     public DbSet<AppUser>        AppUsers        => Set<AppUser>();
@@ -234,6 +245,16 @@ public class AppDbContext : DbContext, IAppDbContext
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<ExpenseLine>()
             .HasQueryFilter(e => !e.IsDeleted);
+
+        // Warehouse Management — org-scoped (no soft-delete on warehouse entities)
+        modelBuilder.Entity<Warehouse>()
+            .HasQueryFilter(e => _orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId);
+        modelBuilder.Entity<InboundOrder>()
+            .HasQueryFilter(e => _orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId);
+        modelBuilder.Entity<OutboundOrder>()
+            .HasQueryFilter(e => _orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId);
+        modelBuilder.Entity<TransferOrder>()
+            .HasQueryFilter(e => _orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

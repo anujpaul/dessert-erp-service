@@ -1,5 +1,6 @@
 using DessertERP.Application.Modules.WarehouseManagement;
 using DessertERP.Application.Modules.WarehouseManagement.DTOs;
+using DessertERP.Application.Common.Interfaces;
 using DessertERP.Domain.Modules.WarehouseManagement;
 using DessertERP.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -9,14 +10,19 @@ namespace DessertERP.Infrastructure.Modules.WarehouseManagement;
 public class WarehouseManagementService : IWarehouseManagementService
 {
     private readonly AppDbContext _db;
+    private readonly ICurrentOrganizationService _org;
 
-    public WarehouseManagementService(AppDbContext db) => _db = db;
+    public WarehouseManagementService(AppDbContext db, ICurrentOrganizationService org)
+    {
+        _db = db;
+        _org = org;
+    }
 
     // ── Warehouses ──────────────────────────────────────────────────────────
 
-    public async Task<List<WarehouseDto>> GetWarehousesAsync(Guid organizationId) =>
+    public async Task<List<WarehouseDto>> GetWarehousesAsync() =>
         await _db.Warehouses
-            .Where(w => w.OrganizationId == organizationId)
+            .Where(w => w.OrganizationId == _org.OrganizationId)
             .OrderBy(w => w.Code)
             .Select(w => ToWarehouseDto(w))
             .ToListAsync();
@@ -30,7 +36,7 @@ public class WarehouseManagementService : IWarehouseManagementService
 
     public async Task<WarehouseDto> CreateWarehouseAsync(CreateWarehouseDto dto)
     {
-        var warehouse = new Warehouse(dto.OrganizationId, dto.Code, dto.Name,
+        var warehouse = new Warehouse(_org.OrganizationId, dto.Code, dto.Name,
             dto.Address, dto.City, dto.Country, dto.IsDefault);
         _db.Warehouses.Add(warehouse);
         await _db.SaveChangesAsync();

@@ -16,8 +16,8 @@ public class WarehouseManagementController : ControllerBase
     // ── Warehouses ───────────────────────────────────────────────────────────
 
     [HttpGet]
-    public async Task<IActionResult> GetWarehouses([FromQuery] Guid organizationId) =>
-        Ok(await _svc.GetWarehousesAsync(organizationId));
+    public async Task<IActionResult> GetWarehouses() =>
+        Ok(await _svc.GetWarehousesAsync());
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetWarehouse(Guid id)
@@ -27,8 +27,11 @@ public class WarehouseManagementController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreateWarehouse([FromBody] CreateWarehouseDto dto) =>
-        Ok(await _svc.CreateWarehouseAsync(dto));
+    public async Task<IActionResult> CreateWarehouse([FromBody] CreateWarehouseDto dto)
+    {
+        try { return StatusCode(201, await _svc.CreateWarehouseAsync(dto)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
 
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> UpdateWarehouse(Guid id, [FromBody] UpdateWarehouseDto dto)

@@ -5,7 +5,7 @@ namespace DessertERP.Application.Modules.WarehouseManagement;
 public interface IWarehouseManagementService
 {
     // ── Warehouses ───────────────────────────────────────────────
-    Task<List<WarehouseDto>>        GetWarehousesAsync(Guid organizationId);
+    Task<List<WarehouseDto>>        GetWarehousesAsync();
     Task<WarehouseDto?>             GetWarehouseAsync(Guid id);
     Task<WarehouseDto>              CreateWarehouseAsync(CreateWarehouseDto dto);
     Task<WarehouseDto?>             UpdateWarehouseAsync(Guid id, UpdateWarehouseDto dto);

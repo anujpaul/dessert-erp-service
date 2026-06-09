@@ -14,7 +14,6 @@ public record WarehouseDto(
 );
 
 public record CreateWarehouseDto(
-    Guid    OrganizationId,
     string  Code,
     string  Name,
     string? Address,

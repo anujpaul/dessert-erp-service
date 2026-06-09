@@ -1585,6 +1585,9 @@ namespace DessertERP.Infrastructure.Migrations
                     b.Property<decimal>("Quantity")
                         .HasColumnType("numeric(18,4)");
 
+                    b.Property<decimal>("QuantityShipped")
+                        .HasColumnType("numeric(18,4)");
+
                     b.Property<Guid>("SalesOrderId")
                         .HasColumnType("uuid");
 

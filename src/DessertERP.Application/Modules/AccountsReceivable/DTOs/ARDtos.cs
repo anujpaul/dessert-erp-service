@@ -63,7 +63,7 @@ public record CustomerLedgerDto(
 // ── Sales Order ───────────────────────────────────────────────────────────────
 public record SalesOrderLineDto(Guid Id, Guid ProductVariantId, string Sku,
     string ProductName, string? VariantDescription, string UnitOfMeasure,
-    decimal Quantity, decimal UnitPrice, decimal DiscountPct, decimal TaxRate,
+    decimal Quantity, decimal QuantityShipped, decimal UnitPrice, decimal DiscountPct, decimal TaxRate,
     decimal LineSubTotal, decimal DiscountAmount, decimal TaxAmount, decimal LineTotal);
 
 public record SalesOrderSummaryDto(Guid Id, string OrderNumber, Guid CustomerId,
@@ -89,7 +89,17 @@ public record AddSalesOrderLineRequest(
     Guid ProductVariantId, decimal Quantity,
     decimal? OverrideUnitPrice = null, decimal DiscountPct = 0);
 
-public record ShipOrderRequest(DateTime ShipDate);
+public record UpdateSalesOrderLineRequest(
+    decimal Quantity, decimal? UnitPrice = null, decimal? DiscountPct = null);
+
+public record ConfirmSalesOrderRequest(decimal BackorderLimit = 0m);
+
+public record ShipOrderLineRequest(Guid LineId, decimal Quantity);
+
+public record ShipOrderRequest(
+    DateTime? ShipDate = null,
+    IReadOnlyList<ShipOrderLineRequest>? Lines = null,
+    string? TrackingNumber = null);
 
 public record ApplyDiscountRequest(decimal DiscountPct);
 

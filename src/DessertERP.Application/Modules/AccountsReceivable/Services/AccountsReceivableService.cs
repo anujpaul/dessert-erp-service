@@ -20,9 +20,10 @@ public interface IAccountsReceivableService
     Task<SalesOrderDto?> GetSalesOrderAsync(Guid id, CancellationToken ct = default);
     Task<SalesOrderDto> CreateSalesOrderAsync(CreateSalesOrderRequest req, CancellationToken ct = default);
     Task<SalesOrderDto> AddSalesOrderLineAsync(Guid orderId, AddSalesOrderLineRequest req, CancellationToken ct = default);
+    Task<SalesOrderDto> UpdateSalesOrderLineAsync(Guid orderId, Guid lineId, UpdateSalesOrderLineRequest req, CancellationToken ct = default);
     Task RemoveSalesOrderLineAsync(Guid orderId, Guid lineId, CancellationToken ct = default);
     Task<SalesOrderDto> ApplyDiscountToOrderAsync(Guid orderId, decimal discountPct, CancellationToken ct = default);
-    Task ConfirmSalesOrderAsync(Guid id, CancellationToken ct = default);
+    Task ConfirmSalesOrderAsync(Guid id, ConfirmSalesOrderRequest req, CancellationToken ct = default);
     Task StartPickingAsync(Guid id, CancellationToken ct = default);
     Task ShipSalesOrderAsync(Guid id, ShipOrderRequest req, CancellationToken ct = default);
     Task CancelSalesOrderAsync(Guid id, CancellationToken ct = default);
@@ -278,6 +279,31 @@ public class AccountsReceivableService : IAccountsReceivableService
         return (await GetSalesOrderAsync(orderId, ct))!;
     }
 
+    public async Task<SalesOrderDto> UpdateSalesOrderLineAsync(
+        Guid orderId, Guid lineId, UpdateSalesOrderLineRequest req, CancellationToken ct = default)
+    {
+        var order = await _db.SalesOrders
+            .FirstOrDefaultAsync(o => o.Id == orderId && !o.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Sales order not found.");
+
+        if (order.Status != SalesOrderStatus.Draft)
+            throw new InvalidOperationException("Lines can only be edited on a Draft order.");
+
+        var line = await _db.SalesOrderLines
+            .FirstOrDefaultAsync(l => l.Id == lineId && l.SalesOrderId == orderId && !l.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Line not found.");
+
+        line.Update(req.Quantity, req.UnitPrice ?? line.UnitPrice, req.DiscountPct ?? line.DiscountPct);
+
+        var lines = await _db.SalesOrderLines
+            .Where(l => l.SalesOrderId == orderId && !l.IsDeleted)
+            .ToListAsync(ct);
+        order.RecalcTotalsFromLines(lines);
+
+        await _db.SaveChangesAsync(ct);
+        return (await GetSalesOrderAsync(orderId, ct))!;
+    }
+
     public async Task RemoveSalesOrderLineAsync(Guid orderId, Guid lineId, CancellationToken ct = default)
     {
         // Load tracked (no Include) so we can update order totals.
@@ -330,11 +356,11 @@ public class AccountsReceivableService : IAccountsReceivableService
         return (await GetSalesOrderAsync(orderId, ct))!;
     }
 
-    public async Task ConfirmSalesOrderAsync(Guid id, CancellationToken ct = default)
+    public async Task ConfirmSalesOrderAsync(Guid id, ConfirmSalesOrderRequest req, CancellationToken ct = default)
     {
         var order = await LoadOrderWithLines(id, ct);
         order.Confirm();
-        await ReserveSalesOrderInventoryAsync(order, ct);
+        await ReserveSalesOrderInventoryAsync(order, req.BackorderLimit, ct);
         await _db.SaveChangesAsync(ct);
     }
 
@@ -348,8 +374,8 @@ public class AccountsReceivableService : IAccountsReceivableService
     public async Task ShipSalesOrderAsync(Guid id, ShipOrderRequest req, CancellationToken ct = default)
     {
         var order = await LoadOrderWithLines(id, ct);
-        order.Ship(req.ShipDate);
-        await ShipSalesOrderInventoryAsync(order, ct);
+        var fullyShipped = await ShipSalesOrderInventoryAsync(order, req, ct);
+        order.Ship(req.ShipDate ?? DateTime.UtcNow, fullyShipped);
         await _db.SaveChangesAsync(ct);
     }
 
@@ -642,14 +668,15 @@ public class AccountsReceivableService : IAccountsReceivableService
             ?? throw new InvalidOperationException("Sales order not found.");
     }
 
-    private async Task ReserveSalesOrderInventoryAsync(SalesOrder order, CancellationToken ct)
+    private async Task ReserveSalesOrderInventoryAsync(
+        SalesOrder order, decimal backorderLimit, CancellationToken ct)
     {
         var records = await LoadInventoryRecordsForOrderAsync(order, ct);
 
         foreach (var lineGroup in ActiveOrderLineQuantities(order))
         {
             var record = records[lineGroup.ProductVariantId];
-            record.Reserve(lineGroup.Quantity);
+            record.Reserve(lineGroup.Quantity, backorderLimit);
             AddInventoryTransaction(order, record, InventoryTransactionType.SaleCommit,
                 lineGroup.Quantity, $"Reserved for sales order {order.OrderNumber}.");
         }
@@ -668,18 +695,36 @@ public class AccountsReceivableService : IAccountsReceivableService
         }
     }
 
-    private async Task ShipSalesOrderInventoryAsync(SalesOrder order, CancellationToken ct)
+    private async Task<bool> ShipSalesOrderInventoryAsync(
+        SalesOrder order, ShipOrderRequest req, CancellationToken ct)
     {
         var records = await LoadInventoryRecordsForOrderAsync(order, ct);
+        var activeLines = order.Lines.Where(l => !l.IsDeleted).ToDictionary(l => l.Id);
+        var requestedLines = req.Lines?.ToList() ??
+            activeLines.Values
+                .Where(l => l.QuantityShipped < l.Quantity)
+                .Select(l => new ShipOrderLineRequest(l.Id, l.Quantity - l.QuantityShipped))
+                .ToList();
 
-        foreach (var lineGroup in ActiveOrderLineQuantities(order))
+        if (requestedLines.Count == 0)
+            throw new InvalidOperationException("At least one shipment line is required.");
+        if (requestedLines.GroupBy(l => l.LineId).Any(g => g.Count() > 1))
+            throw new InvalidOperationException("A sales order line can only appear once in a shipment.");
+
+        foreach (var requestedLine in requestedLines)
         {
-            var record = records[lineGroup.ProductVariantId];
-            record.IssueStock(lineGroup.Quantity);
-            record.Unreserve(lineGroup.Quantity);
+            if (!activeLines.TryGetValue(requestedLine.LineId, out var orderLine))
+                throw new InvalidOperationException("Shipment contains a line that is not on this sales order.");
+
+            orderLine.Ship(requestedLine.Quantity);
+            var record = records[orderLine.ProductVariantId];
+            record.IssueStock(requestedLine.Quantity);
+            record.Unreserve(requestedLine.Quantity);
             AddInventoryTransaction(order, record, InventoryTransactionType.SaleShipment,
-                -lineGroup.Quantity, $"Shipped sales order {order.OrderNumber}.");
+                -requestedLine.Quantity, $"Shipped sales order {order.OrderNumber}, line {orderLine.Sku}.");
         }
+
+        return activeLines.Values.All(l => l.QuantityShipped >= l.Quantity);
     }
 
     private async Task<Dictionary<Guid, InventoryRecord>> LoadInventoryRecordsForOrderAsync(
@@ -758,7 +803,7 @@ public class AccountsReceivableService : IAccountsReceivableService
             o.ARInvoiceId, o.CreatedAt,
             o.Lines.Select(l => new SalesOrderLineDto(
                 l.Id, l.ProductVariantId, l.Sku, l.ProductName, l.VariantDescription,
-                l.UnitOfMeasure, l.Quantity, l.UnitPrice, l.DiscountPct, l.TaxRate,
+                l.UnitOfMeasure, l.Quantity, l.QuantityShipped, l.UnitPrice, l.DiscountPct, l.TaxRate,
                 l.LineSubTotal, l.DiscountAmount, l.TaxAmount, l.LineTotal)).ToList(),
             o.IsExported, o.ExportedAt,
             o.WorkflowInstanceId, o.RejectionReason, o.DeliveredAt, o.DeliveryReference);
@@ -977,7 +1022,7 @@ public class AccountsReceivableService : IAccountsReceivableService
             .FirstOrDefaultAsync(o => o.Id == id && !o.IsDeleted, ct)
             ?? throw new InvalidOperationException("Sales order not found.");
         order.WorkflowApproved();
-        await ReserveSalesOrderInventoryAsync(order, ct);
+        await ReserveSalesOrderInventoryAsync(order, 0m, ct);
         await _db.SaveChangesAsync(ct);
         return (await GetSalesOrderAsync(id, ct))!;
     }

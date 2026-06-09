@@ -661,7 +661,37 @@ public class DataManagementService : IDataManagementService
         {
             try
             {
+                var lineQuantities = order.Lines
+                    .Where(l => !l.IsDeleted)
+                    .GroupBy(l => l.ProductVariantId)
+                    .Select(g => new { ProductVariantId = g.Key, Quantity = g.Sum(l => l.Quantity) })
+                    .ToList();
+                var variantIds = lineQuantities.Select(l => l.ProductVariantId).ToList();
+                var inventory = await _db.InventoryRecords
+                    .Where(r => variantIds.Contains(r.ProductVariantId))
+                    .ToDictionaryAsync(r => r.ProductVariantId, ct);
+
+                if (lineQuantities.Any(l =>
+                        !inventory.TryGetValue(l.ProductVariantId, out var record) ||
+                        l.Quantity > record.QuantityAvailable))
+                    continue;
+
                 order.Confirm();
+                foreach (var line in lineQuantities)
+                {
+                    var record = inventory[line.ProductVariantId];
+                    record.Reserve(line.Quantity);
+                    _db.InventoryTransactions.Add(new InventoryTransaction(
+                        record.OrganizationId,
+                        record.ProductVariantId,
+                        InventoryTransactionType.SaleCommit,
+                        line.Quantity,
+                        record.AverageCost,
+                        record.QuantityOnHand,
+                        referenceNumber: order.OrderNumber,
+                        referenceDocumentId: order.Id,
+                        notes: $"Reserved for imported sales order {order.OrderNumber}."));
+                }
                 confirmed++;
             }
             catch { /* skip orders that can't be confirmed (no lines, wrong status, etc.) */ }

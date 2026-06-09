@@ -2,7 +2,7 @@ using DessertERP.Domain.Common;
 
 namespace DessertERP.Domain.Modules.AccountsReceivable;
 
-public enum SalesOrderStatus { Draft, PendingApproval, Confirmed, Picking, Shipped, Invoiced, Closed, Cancelled }
+public enum SalesOrderStatus { Draft, PendingApproval, Confirmed, Picking, PartiallyShipped, Shipped, Invoiced, Closed, Cancelled }
 
 public class SalesOrder : BaseEntity
 {
@@ -132,11 +132,11 @@ public class SalesOrder : BaseEntity
         SetUpdated();
     }
 
-    public void Ship(DateTime shipDate)
+    public void Ship(DateTime shipDate, bool fullyShipped)
     {
-        if (Status != SalesOrderStatus.Picking)
-            throw new InvalidOperationException("Only a Picking order can be shipped.");
-        Status = SalesOrderStatus.Shipped;
+        if (Status is not (SalesOrderStatus.Picking or SalesOrderStatus.PartiallyShipped))
+            throw new InvalidOperationException("Only a Picking or Partially Shipped order can be shipped.");
+        Status = fullyShipped ? SalesOrderStatus.Shipped : SalesOrderStatus.PartiallyShipped;
         ActualShipDate = shipDate;
         SetUpdated();
     }
@@ -184,7 +184,7 @@ public class SalesOrder : BaseEntity
 
     public void Cancel()
     {
-        if (Status == SalesOrderStatus.Shipped || Status == SalesOrderStatus.Invoiced || Status == SalesOrderStatus.Closed)
+        if (Status == SalesOrderStatus.Shipped || Status == SalesOrderStatus.PartiallyShipped || Status == SalesOrderStatus.Invoiced || Status == SalesOrderStatus.Closed)
             throw new InvalidOperationException("Cannot cancel an order that has been shipped or invoiced.");
         Status = SalesOrderStatus.Cancelled;
         SetUpdated();

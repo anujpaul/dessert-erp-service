@@ -67,6 +67,7 @@ public class SalesOrderLineConfiguration : IEntityTypeConfiguration<SalesOrderLi
         b.Property(e => e.VariantDescription).HasMaxLength(200);
         b.Property(e => e.UnitOfMeasure).HasMaxLength(20);
         b.Property(e => e.Quantity).HasColumnType("numeric(18,4)");
+        b.Property(e => e.QuantityShipped).HasColumnType("numeric(18,4)");
         b.Property(e => e.UnitPrice).HasColumnType("numeric(18,4)");
         b.Property(e => e.DiscountPct).HasColumnType("numeric(8,4)");
         b.Property(e => e.TaxRate).HasColumnType("numeric(8,4)");

@@ -12,6 +12,7 @@ public class SalesOrderLine : BaseEntity
     public string? VariantDescription { get; private set; }  // e.g. "Blue / XL / Cotton"
     public string UnitOfMeasure { get; private set; } = "Each";
     public decimal Quantity { get; private set; }
+    public decimal QuantityShipped { get; private set; }
     public decimal UnitPrice { get; private set; }
     public decimal DiscountPct { get; private set; }
     public decimal TaxRate { get; private set; }
@@ -46,9 +47,21 @@ public class SalesOrderLine : BaseEntity
 
     public void Update(decimal quantity, decimal unitPrice, decimal discountPct)
     {
+        if (quantity <= 0) throw new InvalidOperationException("Quantity must be positive.");
+        if (quantity < QuantityShipped)
+            throw new InvalidOperationException($"Quantity cannot be less than already shipped quantity ({QuantityShipped}).");
         Quantity = quantity;
         UnitPrice = unitPrice;
         DiscountPct = discountPct;
+        SetUpdated();
+    }
+
+    public void Ship(decimal quantity)
+    {
+        if (quantity <= 0) throw new InvalidOperationException("Shipped quantity must be positive.");
+        if (QuantityShipped + quantity > Quantity)
+            throw new InvalidOperationException($"Cannot ship {quantity}; only {Quantity - QuantityShipped} remaining on line {Sku}.");
+        QuantityShipped += quantity;
         SetUpdated();
     }
 }

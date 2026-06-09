@@ -91,11 +91,13 @@ public class InventoryRecord : BaseEntity
         SetUpdated();
     }
 
-    public void Reserve(decimal quantity)
+    public void Reserve(decimal quantity, decimal backorderLimit = 0m)
     {
         if (quantity <= 0) throw new InvalidOperationException("Reserved quantity must be positive.");
-        if (quantity > QuantityAvailable)
-            throw new InvalidOperationException($"Cannot reserve {quantity} - only {QuantityAvailable} available.");
+        if (backorderLimit < 0) throw new InvalidOperationException("Backorder limit cannot be negative.");
+        if (quantity > QuantityAvailable + backorderLimit)
+            throw new InvalidOperationException(
+                $"Cannot reserve {quantity} - only {QuantityAvailable} available and {backorderLimit} allowed for backorder.");
         QuantityReserved += quantity;
         SetUpdated();
     }

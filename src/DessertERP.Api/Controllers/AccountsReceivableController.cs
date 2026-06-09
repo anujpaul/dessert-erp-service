@@ -75,6 +75,14 @@ public class AccountsReceivableController : ControllerBase
         catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
     }
 
+    [HttpPut("sales-orders/{id:guid}/lines/{lineId:guid}")]
+    public async Task<IActionResult> UpdateLine(
+        Guid id, Guid lineId, [FromBody] UpdateSalesOrderLineRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.UpdateSalesOrderLineAsync(id, lineId, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
     /// <summary>Apply a flat discount % to every line on a Draft order (used by coupon application).</summary>
     [HttpPost("sales-orders/{id:guid}/apply-discount")]
     public async Task<IActionResult> ApplyDiscount(Guid id, [FromBody] ApplyDiscountRequest req, CancellationToken ct)
@@ -84,9 +92,10 @@ public class AccountsReceivableController : ControllerBase
     }
 
     [HttpPost("sales-orders/{id:guid}/confirm")]
-    public async Task<IActionResult> Confirm(Guid id, CancellationToken ct)
+    public async Task<IActionResult> Confirm(
+        Guid id, [FromBody] ConfirmSalesOrderRequest req, CancellationToken ct)
     {
-        try { await _svc.ConfirmSalesOrderAsync(id, ct); return NoContent(); }
+        try { await _svc.ConfirmSalesOrderAsync(id, req, ct); return NoContent(); }
         catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
     }
 

@@ -3571,6 +3571,22 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("logo_url");
 
+                    b.Property<int>("MoneyDecimalPlaces")
+                        .HasColumnType("integer")
+                        .HasColumnName("money_decimal_places");
+
+                    b.Property<string>("MoneyRoundingLevel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("money_rounding_level");
+
+                    b.Property<string>("MoneyRoundingMethod")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("money_rounding_method");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)

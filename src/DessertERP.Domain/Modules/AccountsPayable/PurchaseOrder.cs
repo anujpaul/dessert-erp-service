@@ -209,12 +209,23 @@ public class PurchaseOrder : BaseEntity
             throw new InvalidOperationException("Lines can only be removed from a Draft PO.");
     }
 
-    public void RecalcTotalsFromLines(IEnumerable<PurchaseOrderLine> lines)
+    public void RecalcTotalsFromLines(
+        IEnumerable<PurchaseOrderLine> lines,
+        int decimalPlaces = 4,
+        MoneyRoundingMethod roundingMethod = MoneyRoundingMethod.HalfUp,
+        MoneyRoundingLevel roundingLevel = MoneyRoundingLevel.Line)
     {
         var list = lines.ToList();
-        SubTotal   = list.Sum(l => Math.Round(l.OrderedQty * l.UnitCost, 4));
-        TaxTotal   = list.Sum(l => Math.Round(l.OrderedQty * l.UnitCost * l.TaxRate / 100, 4));
-        GrandTotal = SubTotal + TaxTotal;
+        SubTotal = MoneyRounding.Round(list.Sum(l => MoneyRounding.LineValue(
+            l.OrderedQty * l.UnitCost, decimalPlaces, roundingMethod, roundingLevel)), decimalPlaces, roundingMethod);
+        TaxTotal = MoneyRounding.Round(list.Sum(l =>
+        {
+            var lineSubTotal = MoneyRounding.LineValue(
+                l.OrderedQty * l.UnitCost, decimalPlaces, roundingMethod, roundingLevel);
+            return MoneyRounding.LineValue(
+                lineSubTotal * l.TaxRate / 100, decimalPlaces, roundingMethod, roundingLevel);
+        }), decimalPlaces, roundingMethod);
+        GrandTotal = MoneyRounding.Round(SubTotal + TaxTotal, decimalPlaces, roundingMethod);
         SetUpdated();
     }
 

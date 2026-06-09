@@ -1,5 +1,6 @@
 using DessertERP.Application.Common.Interfaces;
 using DessertERP.Application.Common.Services;
+using DessertERP.Domain.Common;
 using DessertERP.Application.Modules.AccountsReceivable.DTOs;
 using DessertERP.Domain.Modules.AccountsReceivable;
 using DessertERP.Domain.Modules.GeneralLedger;
@@ -294,6 +295,12 @@ public class AccountsReceivableService : IAccountsReceivableService
             string.IsNullOrEmpty(variantDesc) ? null : variantDesc,
             product.UnitOfMeasure, req.Quantity, unitPrice, effectiveTaxRate, req.DiscountPct);
         _db.SalesOrderLines.Add(line);
+        var activeLines = await _db.SalesOrderLines
+            .Where(l => l.SalesOrderId == orderId && !l.IsDeleted)
+            .ToListAsync(ct);
+        activeLines.Add(line);
+        var rounding = await GetMoneyRoundingAsync(ct);
+        order.RecalcTotalsFromLines(activeLines, rounding.DecimalPlaces, rounding.Method, rounding.Level);
         _audit.Add("AR", "Line Added", order.Id, "SalesOrder", null, new
         {
             LineId = line.Id,
@@ -328,7 +335,8 @@ public class AccountsReceivableService : IAccountsReceivableService
         var lines = await _db.SalesOrderLines
             .Where(l => l.SalesOrderId == orderId && !l.IsDeleted)
             .ToListAsync(ct);
-        order.RecalcTotalsFromLines(lines);
+        var rounding = await GetMoneyRoundingAsync(ct);
+        order.RecalcTotalsFromLines(lines, rounding.DecimalPlaces, rounding.Method, rounding.Level);
 
         _audit.Add("AR", "Line Updated", order.Id, "SalesOrder", oldLine, new
         {
@@ -361,7 +369,8 @@ public class AccountsReceivableService : IAccountsReceivableService
         var remaining = await _db.SalesOrderLines
             .Where(l => l.SalesOrderId == orderId && !l.IsDeleted && l.Id != lineId)
             .ToListAsync(ct);
-        order.RecalcTotalsFromLines(remaining);
+        var rounding = await GetMoneyRoundingAsync(ct);
+        order.RecalcTotalsFromLines(remaining, rounding.DecimalPlaces, rounding.Method, rounding.Level);
 
         _audit.Add("AR", "Line Removed", order.Id, "SalesOrder", new
         {
@@ -396,7 +405,8 @@ public class AccountsReceivableService : IAccountsReceivableService
             line.Update(line.Quantity, line.UnitPrice, discountPct);
 
         // Recalculate order-level totals from the updated lines.
-        order.RecalcTotalsFromLines(lines);
+        var rounding = await GetMoneyRoundingAsync(ct);
+        order.RecalcTotalsFromLines(lines, rounding.DecimalPlaces, rounding.Method, rounding.Level);
 
         _audit.Add("AR", "Discount Applied", order.Id, "SalesOrder", oldDiscounts, new { DiscountPct = discountPct });
         await _db.SaveChangesAsync(ct);
@@ -739,6 +749,17 @@ public class AccountsReceivableService : IAccountsReceivableService
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private async Task<(int DecimalPlaces, MoneyRoundingMethod Method, MoneyRoundingLevel Level)>
+        GetMoneyRoundingAsync(CancellationToken ct)
+    {
+        var settings = await _db.Organizations
+            .AsNoTracking()
+            .Where(o => o.Id == _org.OrganizationId)
+            .Select(o => new { o.MoneyDecimalPlaces, o.MoneyRoundingMethod, o.MoneyRoundingLevel })
+            .FirstAsync(ct);
+        return (settings.MoneyDecimalPlaces, settings.MoneyRoundingMethod, settings.MoneyRoundingLevel);
+    }
 
     private async Task<SalesOrder> LoadOrderWithLines(Guid id, CancellationToken ct)
     {

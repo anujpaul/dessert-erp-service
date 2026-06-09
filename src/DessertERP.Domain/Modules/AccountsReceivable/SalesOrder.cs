@@ -198,13 +198,32 @@ public class SalesOrder : BaseEntity
     }
 
     /// <summary>Recalculates totals from an externally-supplied list of remaining lines.</summary>
-    public void RecalcTotalsFromLines(IEnumerable<SalesOrderLine> lines)
+    public void RecalcTotalsFromLines(
+        IEnumerable<SalesOrderLine> lines,
+        int decimalPlaces = 4,
+        MoneyRoundingMethod roundingMethod = MoneyRoundingMethod.HalfUp,
+        MoneyRoundingLevel roundingLevel = MoneyRoundingLevel.Line)
     {
         var list = lines.ToList();
-        SubTotal = list.Sum(l => l.LineSubTotal);
-        DiscountTotal = list.Sum(l => l.DiscountAmount);
-        TaxTotal = list.Sum(l => l.TaxAmount);
-        GrandTotal = list.Sum(l => l.LineTotal);
+        SubTotal = MoneyRounding.Round(list.Sum(l => MoneyRounding.LineValue(
+            l.Quantity * l.UnitPrice, decimalPlaces, roundingMethod, roundingLevel)), decimalPlaces, roundingMethod);
+        DiscountTotal = MoneyRounding.Round(list.Sum(l =>
+        {
+            var lineSubTotal = MoneyRounding.LineValue(
+                l.Quantity * l.UnitPrice, decimalPlaces, roundingMethod, roundingLevel);
+            return MoneyRounding.LineValue(
+                lineSubTotal * l.DiscountPct / 100, decimalPlaces, roundingMethod, roundingLevel);
+        }), decimalPlaces, roundingMethod);
+        TaxTotal = MoneyRounding.Round(list.Sum(l =>
+        {
+            var lineSubTotal = MoneyRounding.LineValue(
+                l.Quantity * l.UnitPrice, decimalPlaces, roundingMethod, roundingLevel);
+            var discount = MoneyRounding.LineValue(
+                lineSubTotal * l.DiscountPct / 100, decimalPlaces, roundingMethod, roundingLevel);
+            return MoneyRounding.LineValue(
+                (lineSubTotal - discount) * l.TaxRate / 100, decimalPlaces, roundingMethod, roundingLevel);
+        }), decimalPlaces, roundingMethod);
+        GrandTotal = MoneyRounding.Round(SubTotal - DiscountTotal + TaxTotal, decimalPlaces, roundingMethod);
         SetUpdated();
     }
 

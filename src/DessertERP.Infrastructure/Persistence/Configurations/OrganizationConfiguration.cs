@@ -23,6 +23,11 @@ public class OrganizationConfiguration : IEntityTypeConfiguration<Organization>
         builder.Property(o => o.LogoUrl).HasColumnName("logo_url").HasMaxLength(500);
         builder.Property(o => o.DefaultCurrency).HasColumnName("default_currency").HasMaxLength(3);
         builder.Property(o => o.Timezone).HasColumnName("timezone").HasMaxLength(100);
+        builder.Property(o => o.MoneyDecimalPlaces).HasColumnName("money_decimal_places").IsRequired();
+        builder.Property(o => o.MoneyRoundingMethod).HasColumnName("money_rounding_method")
+            .HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(o => o.MoneyRoundingLevel).HasColumnName("money_rounding_level")
+            .HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(o => o.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(20);
         builder.Property(o => o.CreatedAt).HasColumnName("created_at");
         builder.Property(o => o.UpdatedAt).HasColumnName("updated_at");

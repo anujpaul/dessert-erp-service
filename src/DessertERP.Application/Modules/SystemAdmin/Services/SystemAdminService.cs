@@ -1,5 +1,6 @@
 using DessertERP.Application.Common.Interfaces;
 using DessertERP.Application.Modules.SystemAdmin.DTOs;
+using DessertERP.Domain.Common;
 using DessertERP.Domain.Modules.SystemAdmin;
 using Microsoft.EntityFrameworkCore;
 
@@ -194,7 +195,13 @@ public class SystemAdminService : ISystemAdminService
         var org = await _db.Organizations
             .FirstOrDefaultAsync(o => o.Id == OrgId && !o.IsDeleted, ct)
             ?? throw new InvalidOperationException("Organization not found.");
-        org.UpdateSettings(req.Name, req.LogoUrl, req.DefaultCurrency, req.Timezone, req.TaxId, req.Address);
+        if (!Enum.TryParse<MoneyRoundingMethod>(req.MoneyRoundingMethod, true, out var roundingMethod))
+            throw new InvalidOperationException("Invalid money rounding method.");
+        if (!Enum.TryParse<MoneyRoundingLevel>(req.MoneyRoundingLevel, true, out var roundingLevel))
+            throw new InvalidOperationException("Invalid money rounding level.");
+        org.UpdateSettings(
+            req.Name, req.LogoUrl, req.DefaultCurrency, req.Timezone, req.TaxId, req.Address,
+            req.MoneyDecimalPlaces, roundingMethod, roundingLevel);
         // Also update contact details via the Update method
         org.Update(req.Name, req.Address, req.Phone, req.Email, req.TaxId, req.LogoUrl);
         await _db.SaveChangesAsync(ct);
@@ -204,7 +211,8 @@ public class SystemAdminService : ISystemAdminService
     private static OrgSettingsDto ToOrgSettingsDto(Domain.Modules.Organization.Organization org) =>
         new(org.Id, org.Code, org.Name, org.LogoUrl,
             org.BaseCurrency, org.DefaultCurrency, org.Timezone,
-            org.TaxId, org.Address, org.Phone, org.Email);
+            org.TaxId, org.Address, org.Phone, org.Email,
+            org.MoneyDecimalPlaces, org.MoneyRoundingMethod.ToString(), org.MoneyRoundingLevel.ToString());
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 

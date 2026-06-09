@@ -51,9 +51,13 @@ public record AuditLogDto(
 public record OrgSettingsDto(
     Guid Id, string Code, string Name, string? LogoUrl,
     string BaseCurrency, string DefaultCurrency, string? Timezone,
-    string? TaxId, string? Address, string? Phone, string? Email);
+    string? TaxId, string? Address, string? Phone, string? Email,
+    int MoneyDecimalPlaces, string MoneyRoundingMethod, string MoneyRoundingLevel);
 
 public record UpdateOrgSettingsRequest(
     string Name, string? LogoUrl,
     string DefaultCurrency, string? Timezone,
-    string? TaxId, string? Address, string? Phone, string? Email);
+    string? TaxId, string? Address, string? Phone, string? Email,
+    int MoneyDecimalPlaces = 4,
+    string MoneyRoundingMethod = "HalfUp",
+    string MoneyRoundingLevel = "Line");

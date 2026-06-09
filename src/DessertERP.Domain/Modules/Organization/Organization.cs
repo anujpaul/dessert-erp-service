@@ -17,6 +17,9 @@ public class Organization : BaseEntity
     public string? LogoUrl         { get; private set; }
     public string  DefaultCurrency { get; private set; } = "USD";
     public string? Timezone        { get; private set; }
+    public int MoneyDecimalPlaces { get; private set; } = 4;
+    public MoneyRoundingMethod MoneyRoundingMethod { get; private set; } = MoneyRoundingMethod.HalfUp;
+    public MoneyRoundingLevel MoneyRoundingLevel { get; private set; } = MoneyRoundingLevel.Line;
     public OrganizationStatus Status { get; private set; } = OrganizationStatus.Active;
 
     private Organization() { }
@@ -59,14 +62,28 @@ public class Organization : BaseEntity
         SetUpdated();
     }
 
-    public void UpdateSettings(string name, string? logoUrl, string defaultCurrency, string? timezone, string? taxId, string? address)
+    public void UpdateSettings(
+        string name,
+        string? logoUrl,
+        string defaultCurrency,
+        string? timezone,
+        string? taxId,
+        string? address,
+        int moneyDecimalPlaces,
+        MoneyRoundingMethod moneyRoundingMethod,
+        MoneyRoundingLevel moneyRoundingLevel)
     {
+        if (moneyDecimalPlaces is < 0 or > 4)
+            throw new ArgumentException("Money decimal places must be between 0 and 4.");
         Name            = name.Trim();
         LogoUrl         = logoUrl;
         DefaultCurrency = defaultCurrency.ToUpperInvariant();
         Timezone        = timezone;
         TaxId           = taxId;
         Address         = address;
+        MoneyDecimalPlaces = moneyDecimalPlaces;
+        MoneyRoundingMethod = moneyRoundingMethod;
+        MoneyRoundingLevel = moneyRoundingLevel;
         SetUpdated();
     }
 

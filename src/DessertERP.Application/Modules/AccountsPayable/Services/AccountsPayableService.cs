@@ -1,5 +1,6 @@
 using DessertERP.Application.Common.Interfaces;
 using DessertERP.Application.Common.Services;
+using DessertERP.Domain.Common;
 using DessertERP.Application.Modules.AccountsPayable.DTOs;
 using DessertERP.Domain.Modules.AccountsPayable;
 using DessertERP.Domain.Modules.ProductManagement;
@@ -235,6 +236,12 @@ public class AccountsPayableService : IAccountsPayableService
         var line = po.AddLine(req.ProductVariantId, req.ProductCode, req.Description,
             req.UnitOfMeasure, req.Quantity, req.UnitCost, req.TaxRate);
         _db.PurchaseOrderLines.Add(line);
+        var activeLines = await _db.PurchaseOrderLines
+            .Where(l => l.PurchaseOrderId == poId && !l.IsDeleted)
+            .ToListAsync(ct);
+        activeLines.Add(line);
+        var rounding = await GetMoneyRoundingAsync(ct);
+        po.RecalcTotalsFromLines(activeLines, rounding.DecimalPlaces, rounding.Method, rounding.Level);
         _audit.Add("AP", "Line Added", po.Id, "PurchaseOrder", null, new
         {
             LineId = line.Id,
@@ -264,7 +271,8 @@ public class AccountsPayableService : IAccountsPayableService
         var remaining = await _db.PurchaseOrderLines
             .Where(l => l.PurchaseOrderId == poId && !l.IsDeleted && l.Id != lineId)
             .ToListAsync(ct);
-        po.RecalcTotalsFromLines(remaining);
+        var rounding = await GetMoneyRoundingAsync(ct);
+        po.RecalcTotalsFromLines(remaining, rounding.DecimalPlaces, rounding.Method, rounding.Level);
 
         _audit.Add("AP", "Line Removed", po.Id, "PurchaseOrder", new
         {
@@ -597,6 +605,17 @@ public class AccountsPayableService : IAccountsPayableService
     }
 
     // Helpers
+
+    private async Task<(int DecimalPlaces, MoneyRoundingMethod Method, MoneyRoundingLevel Level)>
+        GetMoneyRoundingAsync(CancellationToken ct)
+    {
+        var settings = await _db.Organizations
+            .AsNoTracking()
+            .Where(o => o.Id == _org.OrganizationId)
+            .Select(o => new { o.MoneyDecimalPlaces, o.MoneyRoundingMethod, o.MoneyRoundingLevel })
+            .FirstAsync(ct);
+        return (settings.MoneyDecimalPlaces, settings.MoneyRoundingMethod, settings.MoneyRoundingLevel);
+    }
 
     private async Task<PurchaseOrder> LoadPOWithLines(Guid id, CancellationToken ct)
     {

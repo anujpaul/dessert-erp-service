@@ -45,6 +45,8 @@ public class TransferOrderLine : BaseEntity
     public void Ship(decimal quantity)
     {
         if (quantity <= 0) throw new ArgumentException("Shipped quantity must be positive.");
+        if (ShippedQuantity + quantity > RequestedQuantity)
+            throw new InvalidOperationException("Shipped quantity cannot exceed the requested quantity.");
         ShippedQuantity += quantity;
         SetUpdated();
     }
@@ -52,6 +54,8 @@ public class TransferOrderLine : BaseEntity
     public void Receive(decimal quantity, Guid? toLocationId = null)
     {
         if (quantity <= 0) throw new ArgumentException("Received quantity must be positive.");
+        if (ReceivedQuantity + quantity > ShippedQuantity)
+            throw new InvalidOperationException("Received quantity cannot exceed the shipped quantity.");
         ReceivedQuantity += quantity;
         if (toLocationId.HasValue) ToLocationId = toLocationId;
         SetUpdated();

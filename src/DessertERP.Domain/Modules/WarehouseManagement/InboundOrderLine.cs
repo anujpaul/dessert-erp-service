@@ -44,6 +44,8 @@ public class InboundOrderLine : BaseEntity
     {
         if (quantity <= 0)
             throw new ArgumentException("Received quantity must be positive.");
+        if (ReceivedQuantity + quantity > OrderedQuantity)
+            throw new InvalidOperationException("Received quantity cannot exceed the ordered quantity.");
         ReceivedQuantity += quantity;
         if (locationId.HasValue) LocationId = locationId;
         SetUpdated();

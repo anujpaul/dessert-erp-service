@@ -39,6 +39,37 @@ public class WarehouseLocationConfiguration : IEntityTypeConfiguration<Warehouse
     }
 }
 
+public class WarehouseInventoryBalanceConfiguration : IEntityTypeConfiguration<WarehouseInventoryBalance>
+{
+    public void Configure(EntityTypeBuilder<WarehouseInventoryBalance> b)
+    {
+        b.ToTable("WarehouseInventoryBalances");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.QuantityOnHand).HasColumnType("decimal(18,4)");
+        b.Property(e => e.QuantityReserved).HasColumnType("decimal(18,4)");
+        b.Ignore(e => e.QuantityAvailable);
+        b.HasIndex(e => new
+        {
+            e.OrganizationId,
+            e.ProductVariantId,
+            e.WarehouseId,
+            e.WarehouseLocationId
+        }).IsUnique();
+        b.HasOne(e => e.ProductVariant)
+            .WithMany()
+            .HasForeignKey(e => e.ProductVariantId)
+            .OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(e => e.Warehouse)
+            .WithMany()
+            .HasForeignKey(e => e.WarehouseId)
+            .OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(e => e.WarehouseLocation)
+            .WithMany()
+            .HasForeignKey(e => e.WarehouseLocationId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 public class InboundOrderConfiguration : IEntityTypeConfiguration<InboundOrder>
 {
     public void Configure(EntityTypeBuilder<InboundOrder> b)

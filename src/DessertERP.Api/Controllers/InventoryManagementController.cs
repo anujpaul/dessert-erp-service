@@ -107,6 +107,21 @@ public class InventoryManagementController : ControllerBase
         catch (InvalidOperationException ex) { return NotFound(new { error = ex.Message }); }
     }
 
+    [HttpGet("items/{id:guid}/warehouse-balances")]
+    public async Task<IActionResult> GetWarehouseBalances(Guid id, CancellationToken ct)
+    {
+        try { return Ok(await _svc.GetWarehouseBalancesAsync(id, ct)); }
+        catch (InvalidOperationException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
+    [HttpPut("items/{id:guid}/warehouse-balances")]
+    public async Task<IActionResult> SetWarehouseBalance(
+        Guid id, [FromBody] SetWarehouseInventoryBalanceRequest req, CancellationToken ct)
+    {
+        try { return Ok(await _svc.SetWarehouseBalanceAsync(id, req, ct)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
     // ── Transaction ledger ───────────────────────────────────────────────────
 
     /// <summary>Transaction history for a single product variant. ?take=100</summary>

@@ -96,8 +96,11 @@ public class WarehouseManagementController : ControllerBase
         await _svc.StartReceivingInboundAsync(id) ? Ok() : NotFound();
 
     [HttpPost("inbound/{id:guid}/receive-lines")]
-    public async Task<IActionResult> ReceiveLines(Guid id, [FromBody] List<ReceiveInboundLineDto> lines) =>
-        await _svc.ReceiveInboundLinesAsync(id, lines) ? Ok() : NotFound();
+    public async Task<IActionResult> ReceiveLines(Guid id, [FromBody] List<ReceiveInboundLineDto> lines)
+    {
+        try { return await _svc.ReceiveInboundLinesAsync(id, lines) ? Ok() : NotFound(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
 
     [HttpPost("inbound/{id:guid}/complete")]
     public async Task<IActionResult> CompleteInbound(Guid id) =>
@@ -137,8 +140,11 @@ public class WarehouseManagementController : ControllerBase
         await _svc.PackOutboundOrderAsync(id) ? Ok() : NotFound();
 
     [HttpPost("outbound/{id:guid}/ship")]
-    public async Task<IActionResult> ShipOutbound(Guid id, [FromBody] ShipOutboundOrderDto dto) =>
-        await _svc.ShipOutboundOrderAsync(id, dto) ? Ok() : NotFound();
+    public async Task<IActionResult> ShipOutbound(Guid id, [FromBody] ShipOutboundOrderDto dto)
+    {
+        try { return await _svc.ShipOutboundOrderAsync(id, dto) ? Ok() : NotFound(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
 
     [HttpPost("outbound/{id:guid}/deliver")]
     public async Task<IActionResult> DeliverOutbound(Guid id) =>
@@ -170,16 +176,22 @@ public class WarehouseManagementController : ControllerBase
         await _svc.ConfirmTransferOrderAsync(id) ? Ok() : NotFound();
 
     [HttpPost("transfer/{id:guid}/ship")]
-    public async Task<IActionResult> ShipTransfer(Guid id, [FromBody] DateTime shippedDate) =>
-        await _svc.ShipTransferOrderAsync(id, shippedDate) ? Ok() : NotFound();
+    public async Task<IActionResult> ShipTransfer(Guid id, [FromBody] DateTime shippedDate)
+    {
+        try { return await _svc.ShipTransferOrderAsync(id, shippedDate) ? Ok() : NotFound(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
 
     [HttpPost("transfer/{id:guid}/start-receiving")]
     public async Task<IActionResult> StartReceivingTransfer(Guid id) =>
         await _svc.StartReceivingTransferAsync(id) ? Ok() : NotFound();
 
     [HttpPost("transfer/{id:guid}/complete")]
-    public async Task<IActionResult> CompleteTransfer(Guid id) =>
-        await _svc.CompleteTransferOrderAsync(id) ? Ok() : NotFound();
+    public async Task<IActionResult> CompleteTransfer(Guid id)
+    {
+        try { return await _svc.CompleteTransferOrderAsync(id) ? Ok() : NotFound(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
 
     [HttpPost("transfer/{id:guid}/cancel")]
     public async Task<IActionResult> CancelTransfer(Guid id) =>

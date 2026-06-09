@@ -27,6 +27,9 @@ public interface IInventoryManagementService
     Task<InventoryItemDto> AdjustStockAsync(Guid inventoryRecordId, AdjustStockRequest req, CancellationToken ct = default);
     Task<InventoryItemDto> SetOnHandAsync(Guid inventoryRecordId, SetOnHandRequest req, CancellationToken ct = default);
     Task<InventoryItemDto> UpdateThresholdsAsync(Guid inventoryRecordId, UpdateThresholdsRequest req, CancellationToken ct = default);
+    Task<WarehouseInventoryAllocationDto> GetWarehouseBalancesAsync(Guid inventoryRecordId, CancellationToken ct = default);
+    Task<WarehouseInventoryAllocationDto> SetWarehouseBalanceAsync(
+        Guid inventoryRecordId, SetWarehouseInventoryBalanceRequest req, CancellationToken ct = default);
 
     // Reports
     Task<IEnumerable<LowStockItemDto>>    GetLowStockAsync(CancellationToken ct = default);
@@ -276,6 +279,61 @@ public class InventoryManagementService : IInventoryManagementService
         return await GetItemAsync(inventoryRecordId, ct);
     }
 
+    public async Task<WarehouseInventoryAllocationDto> GetWarehouseBalancesAsync(
+        Guid inventoryRecordId, CancellationToken ct = default)
+    {
+        var record = await LoadRecord(inventoryRecordId, ct);
+        return await BuildWarehouseAllocation(record, ct);
+    }
+
+    public async Task<WarehouseInventoryAllocationDto> SetWarehouseBalanceAsync(
+        Guid inventoryRecordId, SetWarehouseInventoryBalanceRequest req, CancellationToken ct = default)
+    {
+        if (req.QuantityOnHand < 0)
+            throw new InvalidOperationException("Warehouse quantity cannot be negative.");
+
+        var record = await LoadRecord(inventoryRecordId, ct);
+        var warehouse = await _db.Warehouses
+            .FirstOrDefaultAsync(w => w.Id == req.WarehouseId && w.OrganizationId == record.OrganizationId, ct)
+            ?? throw new InvalidOperationException("Warehouse not found.");
+        if (!warehouse.IsActive)
+            throw new InvalidOperationException("Inventory cannot be assigned to an inactive warehouse.");
+
+        var location = await _db.WarehouseLocations
+            .FirstOrDefaultAsync(l => l.Id == req.WarehouseLocationId && l.WarehouseId == warehouse.Id, ct)
+            ?? throw new InvalidOperationException("The selected location does not belong to this warehouse.");
+        if (!location.IsActive)
+            throw new InvalidOperationException("Inventory cannot be assigned to an inactive location.");
+
+        var balance = await _db.WarehouseInventoryBalances.FirstOrDefaultAsync(
+            b => b.ProductVariantId == record.ProductVariantId
+                && b.WarehouseId == warehouse.Id
+                && b.WarehouseLocationId == location.Id, ct);
+
+        var otherAllocated = await _db.WarehouseInventoryBalances
+            .Where(b => b.ProductVariantId == record.ProductVariantId
+                && (balance == null || b.Id != balance.Id))
+            .SumAsync(b => b.QuantityOnHand, ct);
+
+        if (otherAllocated + req.QuantityOnHand > record.QuantityOnHand)
+            throw new InvalidOperationException(
+                $"Cannot allocate {req.QuantityOnHand}; only {record.QuantityOnHand - otherAllocated} remains unallocated.");
+
+        if (balance is null)
+        {
+            balance = new Domain.Modules.WarehouseManagement.WarehouseInventoryBalance(
+                record.OrganizationId, record.ProductVariantId, warehouse.Id, location.Id, req.QuantityOnHand);
+            _db.WarehouseInventoryBalances.Add(balance);
+        }
+        else
+        {
+            balance.SetOnHand(req.QuantityOnHand);
+        }
+
+        await _db.SaveChangesAsync(ct);
+        return await BuildWarehouseAllocation(record, ct);
+    }
+
     // ── Reports ───────────────────────────────────────────────────────────────
 
     public async Task<IEnumerable<LowStockItemDto>> GetLowStockAsync(CancellationToken ct = default)
@@ -344,6 +402,36 @@ public class InventoryManagementService : IInventoryManagementService
         return await _db.InventoryRecords
             .FirstOrDefaultAsync(r => r.Id == id, ct)
             ?? throw new InvalidOperationException("Inventory record not found.");
+    }
+
+    private async Task<WarehouseInventoryAllocationDto> BuildWarehouseAllocation(
+        InventoryRecord record, CancellationToken ct)
+    {
+        var balances = await _db.WarehouseInventoryBalances
+            .AsNoTracking()
+            .Where(b => b.ProductVariantId == record.ProductVariantId)
+            .Include(b => b.Warehouse)
+            .Include(b => b.WarehouseLocation)
+            .OrderBy(b => b.Warehouse!.Code)
+            .ThenBy(b => b.WarehouseLocation!.Code)
+            .Select(b => new WarehouseInventoryBalanceDto(
+                b.Id,
+                b.WarehouseId,
+                b.Warehouse!.Code,
+                b.Warehouse.Name,
+                b.WarehouseLocationId,
+                b.WarehouseLocation!.Code,
+                b.QuantityOnHand,
+                b.QuantityReserved,
+                b.QuantityOnHand - b.QuantityReserved))
+            .ToListAsync(ct);
+
+        var allocated = balances.Sum(b => b.OnHand);
+        return new WarehouseInventoryAllocationDto(
+            record.QuantityOnHand,
+            allocated,
+            Math.Max(0m, record.QuantityOnHand - allocated),
+            balances);
     }
 
     private static string? BuildVariantDesc(ProductVariant? v)

@@ -50,6 +50,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<ProductVariant>  ProductVariants  => Set<ProductVariant>();
     public DbSet<InventoryRecord>      InventoryRecords      => Set<InventoryRecord>();
     public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
+    public DbSet<WarehouseInventoryBalance> WarehouseInventoryBalances => Set<WarehouseInventoryBalance>();
 
     // General Ledger
     public DbSet<FiscalYear>   FiscalYears   => Set<FiscalYear>();
@@ -175,6 +176,8 @@ public class AppDbContext : DbContext, IAppDbContext
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<InventoryTransaction>()
             .HasQueryFilter(e => (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<WarehouseInventoryBalance>()
+            .HasQueryFilter(e => _orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId);
 
         // GL
         modelBuilder.Entity<FiscalYear>()

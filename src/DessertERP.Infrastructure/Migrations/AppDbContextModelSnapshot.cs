@@ -5274,6 +5274,53 @@ namespace DessertERP.Infrastructure.Migrations
                     b.ToTable("Warehouses", (string)null);
                 });
 
+            modelBuilder.Entity("DessertERP.Domain.Modules.WarehouseManagement.WarehouseInventoryBalance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductVariantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("QuantityOnHand")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("QuantityReserved")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WarehouseLocationId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductVariantId");
+
+                    b.HasIndex("WarehouseId");
+
+                    b.HasIndex("WarehouseLocationId");
+
+                    b.HasIndex("OrganizationId", "ProductVariantId", "WarehouseId", "WarehouseLocationId")
+                        .IsUnique();
+
+                    b.ToTable("WarehouseInventoryBalances", (string)null);
+                });
+
             modelBuilder.Entity("DessertERP.Domain.Modules.WarehouseManagement.WarehouseLocation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6297,6 +6344,33 @@ namespace DessertERP.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("DessertERP.Domain.Modules.WarehouseManagement.WarehouseInventoryBalance", b =>
+                {
+                    b.HasOne("DessertERP.Domain.Modules.ProductManagement.ProductVariant", "ProductVariant")
+                        .WithMany()
+                        .HasForeignKey("ProductVariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DessertERP.Domain.Modules.WarehouseManagement.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DessertERP.Domain.Modules.WarehouseManagement.WarehouseLocation", "WarehouseLocation")
+                        .WithMany()
+                        .HasForeignKey("WarehouseLocationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ProductVariant");
+
+                    b.Navigation("Warehouse");
+
+                    b.Navigation("WarehouseLocation");
                 });
 
             modelBuilder.Entity("DessertERP.Domain.Modules.Workflow.WorkflowApprovalStep", b =>

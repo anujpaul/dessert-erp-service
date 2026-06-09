@@ -2,6 +2,7 @@ using DessertERP.Application.Modules.WarehouseManagement;
 using DessertERP.Application.Modules.WarehouseManagement.DTOs;
 using DessertERP.Application.Common.Interfaces;
 using DessertERP.Domain.Modules.WarehouseManagement;
+using DessertERP.Domain.Modules.ProductManagement;
 using DessertERP.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -159,7 +160,19 @@ public class WarehouseManagementService : IWarehouseManagementService
         foreach (var r in lines)
         {
             var line = order.Lines.FirstOrDefault(l => l.Id == r.LineId);
-            line?.Receive(r.Quantity, r.LocationId);
+            if (line is null) continue;
+
+            var locationId = r.LocationId ?? line.LocationId
+                ?? throw new InvalidOperationException($"A receiving location is required for line {line.LineNumber}.");
+            await ValidateLocation(locationId, order.WarehouseId, requireReceivable: true);
+
+            var inventory = await GetInventoryRecord(line.ProductId);
+            var balance = await GetOrCreateBalance(
+                order.OrganizationId, line.ProductId, order.WarehouseId, locationId);
+
+            line.Receive(r.Quantity, locationId);
+            balance.Receive(r.Quantity);
+            inventory.ReceiveStock(r.Quantity, inventory.AverageCost);
         }
         await _db.SaveChangesAsync();
         return true;
@@ -219,8 +232,25 @@ public class WarehouseManagementService : IWarehouseManagementService
 
     public async Task<bool> ShipOutboundOrderAsync(Guid id, ShipOutboundOrderDto dto)
     {
-        var o = await _db.OutboundOrders.FindAsync(id);
+        var o = await _db.OutboundOrders.Include(x => x.Lines).FirstOrDefaultAsync(x => x.Id == id);
         if (o is null) return false;
+
+        foreach (var line in o.Lines)
+        {
+            var quantity = line.RequestedQuantity - line.ShippedQuantity;
+            if (quantity <= 0) continue;
+            var locationId = line.FromLocationId
+                ?? throw new InvalidOperationException($"A pick location is required for line {line.LineNumber}.");
+            await ValidateLocation(locationId, o.WarehouseId, requirePickable: true);
+
+            var inventory = await GetInventoryRecord(line.ProductId);
+            var balance = await GetExistingBalance(line.ProductId, o.WarehouseId, locationId);
+            balance.Issue(quantity);
+            inventory.IssueStock(quantity);
+            line.Pick(quantity);
+            line.Ship(quantity);
+        }
+
         o.Ship(dto.ShippedDate, dto.TrackingNumber, dto.Carrier);
         await _db.SaveChangesAsync();
         return true;
@@ -277,13 +307,47 @@ public class WarehouseManagementService : IWarehouseManagementService
 
     public async Task<bool> ConfirmTransferOrderAsync(Guid id)        => await AdvanceTransfer(id, o => o.Confirm());
     public async Task<bool> StartReceivingTransferAsync(Guid id)      => await AdvanceTransfer(id, o => o.StartReceiving());
-    public async Task<bool> CompleteTransferOrderAsync(Guid id)       => await AdvanceTransfer(id, o => o.Complete(DateTime.UtcNow));
+    public async Task<bool> CompleteTransferOrderAsync(Guid id)
+    {
+        var o = await _db.TransferOrders.Include(x => x.Lines).FirstOrDefaultAsync(x => x.Id == id);
+        if (o is null) return false;
+
+        foreach (var line in o.Lines)
+        {
+            var quantity = line.ShippedQuantity - line.ReceivedQuantity;
+            if (quantity <= 0) continue;
+            var locationId = line.ToLocationId
+                ?? throw new InvalidOperationException($"A destination location is required for line {line.LineNumber}.");
+            await ValidateLocation(locationId, o.ToWarehouseId, requireReceivable: true);
+            var balance = await GetOrCreateBalance(
+                o.OrganizationId, line.ProductId, o.ToWarehouseId, locationId);
+            balance.Receive(quantity);
+            line.Receive(quantity, locationId);
+        }
+
+        o.Complete(DateTime.UtcNow);
+        await _db.SaveChangesAsync();
+        return true;
+    }
     public async Task<bool> CancelTransferOrderAsync(Guid id)         => await AdvanceTransfer(id, o => o.Cancel());
 
     public async Task<bool> ShipTransferOrderAsync(Guid id, DateTime shippedDate)
     {
-        var o = await _db.TransferOrders.FindAsync(id);
+        var o = await _db.TransferOrders.Include(x => x.Lines).FirstOrDefaultAsync(x => x.Id == id);
         if (o is null) return false;
+
+        foreach (var line in o.Lines)
+        {
+            var quantity = line.RequestedQuantity - line.ShippedQuantity;
+            if (quantity <= 0) continue;
+            var locationId = line.FromLocationId
+                ?? throw new InvalidOperationException($"A source location is required for line {line.LineNumber}.");
+            await ValidateLocation(locationId, o.FromWarehouseId, requirePickable: true);
+            var balance = await GetExistingBalance(line.ProductId, o.FromWarehouseId, locationId);
+            balance.Issue(quantity);
+            line.Ship(quantity);
+        }
+
         o.Ship(shippedDate);
         await _db.SaveChangesAsync();
         return true;
@@ -296,6 +360,48 @@ public class WarehouseManagementService : IWarehouseManagementService
         action(o);
         await _db.SaveChangesAsync();
         return true;
+    }
+
+    private async Task<InventoryRecord> GetInventoryRecord(Guid productVariantId) =>
+        await _db.InventoryRecords.FirstOrDefaultAsync(r => r.ProductVariantId == productVariantId)
+        ?? throw new InvalidOperationException("Inventory record was not found for the warehouse order line.");
+
+    private async Task<WarehouseInventoryBalance> GetExistingBalance(
+        Guid productVariantId, Guid warehouseId, Guid locationId) =>
+        await _db.WarehouseInventoryBalances.FirstOrDefaultAsync(b =>
+            b.ProductVariantId == productVariantId
+            && b.WarehouseId == warehouseId
+            && b.WarehouseLocationId == locationId)
+        ?? throw new InvalidOperationException("No inventory is allocated to the selected warehouse location.");
+
+    private async Task<WarehouseInventoryBalance> GetOrCreateBalance(
+        Guid organizationId, Guid productVariantId, Guid warehouseId, Guid locationId)
+    {
+        var balance = await _db.WarehouseInventoryBalances.FirstOrDefaultAsync(b =>
+            b.ProductVariantId == productVariantId
+            && b.WarehouseId == warehouseId
+            && b.WarehouseLocationId == locationId);
+        if (balance is not null) return balance;
+
+        balance = new WarehouseInventoryBalance(
+            organizationId, productVariantId, warehouseId, locationId);
+        _db.WarehouseInventoryBalances.Add(balance);
+        return balance;
+    }
+
+    private async Task ValidateLocation(
+        Guid locationId, Guid warehouseId, bool requirePickable = false, bool requireReceivable = false)
+    {
+        var location = await _db.WarehouseLocations.FirstOrDefaultAsync(l =>
+            l.Id == locationId && l.WarehouseId == warehouseId);
+        if (location is null)
+            throw new InvalidOperationException("The selected location does not belong to the order warehouse.");
+        if (!location.IsActive)
+            throw new InvalidOperationException("The selected warehouse location is inactive.");
+        if (requirePickable && !location.IsPickable)
+            throw new InvalidOperationException("The selected warehouse location is not pickable.");
+        if (requireReceivable && !location.IsReceivable)
+            throw new InvalidOperationException("The selected warehouse location is not receivable.");
     }
 
     // ── Mapping helpers ─────────────────────────────────────────────────────

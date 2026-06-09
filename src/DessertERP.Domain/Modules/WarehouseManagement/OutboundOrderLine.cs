@@ -43,6 +43,8 @@ public class OutboundOrderLine : BaseEntity
     {
         if (quantity <= 0)
             throw new ArgumentException("Picked quantity must be positive.");
+        if (PickedQuantity + quantity > RequestedQuantity)
+            throw new InvalidOperationException("Picked quantity cannot exceed the requested quantity.");
         PickedQuantity += quantity;
         if (fromLocationId.HasValue) FromLocationId = fromLocationId;
         SetUpdated();
@@ -52,6 +54,8 @@ public class OutboundOrderLine : BaseEntity
     {
         if (quantity <= 0)
             throw new ArgumentException("Shipped quantity must be positive.");
+        if (ShippedQuantity + quantity > PickedQuantity)
+            throw new InvalidOperationException("Shipped quantity cannot exceed the picked quantity.");
         ShippedQuantity += quantity;
         SetUpdated();
     }

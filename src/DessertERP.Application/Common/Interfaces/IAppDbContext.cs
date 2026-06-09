@@ -11,6 +11,7 @@ using DessertERP.Domain.Modules.Retail;
 using DessertERP.Domain.Modules.SystemAdmin;
 using DessertERP.Domain.Modules.Workflow;
 using DessertERP.Domain.Modules.Expenses;
+using DessertERP.Domain.Modules.WarehouseManagement;
 using Microsoft.EntityFrameworkCore;
 
 namespace DessertERP.Application.Common.Interfaces;
@@ -38,6 +39,9 @@ public interface IAppDbContext
     DbSet<ProductVariant>  ProductVariants  { get; }
     DbSet<InventoryRecord>      InventoryRecords      { get; }
     DbSet<InventoryTransaction> InventoryTransactions { get; }
+    DbSet<Warehouse> Warehouses { get; }
+    DbSet<WarehouseLocation> WarehouseLocations { get; }
+    DbSet<WarehouseInventoryBalance> WarehouseInventoryBalances { get; }
 
     // General Ledger
     DbSet<FiscalYear>    FiscalYears    { get; }

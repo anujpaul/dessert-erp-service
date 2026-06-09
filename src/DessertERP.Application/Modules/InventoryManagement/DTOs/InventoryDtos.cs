@@ -103,6 +103,31 @@ public record UpdateThresholdsRequest(
     string? Location
 );
 
+public record WarehouseInventoryBalanceDto(
+    Guid Id,
+    Guid WarehouseId,
+    string WarehouseCode,
+    string WarehouseName,
+    Guid WarehouseLocationId,
+    string LocationCode,
+    decimal OnHand,
+    decimal Reserved,
+    decimal Available
+);
+
+public record WarehouseInventoryAllocationDto(
+    decimal TotalOnHand,
+    decimal AllocatedOnHand,
+    decimal UnallocatedOnHand,
+    IReadOnlyList<WarehouseInventoryBalanceDto> Balances
+);
+
+public record SetWarehouseInventoryBalanceRequest(
+    Guid WarehouseId,
+    Guid WarehouseLocationId,
+    decimal QuantityOnHand
+);
+
 // ── Reports ─────────────────────────────────────────────────────────────────
 
 public record LowStockItemDto(

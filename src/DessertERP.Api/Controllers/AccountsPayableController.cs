@@ -52,6 +52,10 @@ public class AccountsPayableController : ControllerBase
         return dto is null ? NotFound() : Ok(dto);
     }
 
+    [HttpGet("purchase-orders/{id:guid}/history")]
+    public async Task<IActionResult> GetPurchaseOrderHistory(Guid id, CancellationToken ct)
+        => Ok(await _svc.GetPurchaseOrderHistoryAsync(id, ct));
+
     [HttpPost("purchase-orders")]
     public async Task<IActionResult> CreatePurchaseOrder([FromBody] CreatePurchaseOrderRequest req, CancellationToken ct)
     {

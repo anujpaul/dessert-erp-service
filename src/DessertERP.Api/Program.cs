@@ -5,6 +5,7 @@ using Microsoft.OpenApi.Models;
 
 
 using DessertERP.Application.Common.Interfaces;
+using DessertERP.Application.Common.Services;
 using DessertERP.Application.Modules.AccountsPayable.Services;
 using DessertERP.Application.Modules.AccountsReceivable.Services;
 using DessertERP.Application.Modules.DataManagement.Services;
@@ -62,6 +63,8 @@ builder.Services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbConte
 
 // ── Organization scope ────────────────────────────────────────────────────────
 builder.Services.AddScoped<ICurrentOrganizationService, CurrentOrganizationService>();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddScoped<IDocumentAuditService, DocumentAuditService>();
 
 // ── Application Services ──────────────────────────────────────────────────────
 builder.Services.AddScoped<IOrganizationService, OrganizationService>();

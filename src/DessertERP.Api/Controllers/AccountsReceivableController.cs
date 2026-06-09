@@ -52,6 +52,10 @@ public class AccountsReceivableController : ControllerBase
         return dto is null ? NotFound() : Ok(dto);
     }
 
+    [HttpGet("sales-orders/{id:guid}/history")]
+    public async Task<IActionResult> GetSalesOrderHistory(Guid id, CancellationToken ct)
+        => Ok(await _svc.GetSalesOrderHistoryAsync(id, ct));
+
     [HttpPost("sales-orders")]
     public async Task<IActionResult> CreateSalesOrder([FromBody] CreateSalesOrderRequest req, CancellationToken ct)
     {

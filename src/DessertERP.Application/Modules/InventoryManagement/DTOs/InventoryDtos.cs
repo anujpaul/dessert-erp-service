@@ -46,6 +46,20 @@ public record InventorySummaryDto(
     int  OnOrderLines         // distinct SKUs with OnOrder > 0
 );
 
+public record PagedInventoryItemsDto(
+    IReadOnlyList<InventoryItemDto> Items,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    int TotalPages
+);
+
+public record InventoryFilterOptionsDto(
+    IReadOnlyList<string> Categories,
+    IReadOnlyList<string> Brands,
+    IReadOnlyList<string> Locations
+);
+
 // ── Transaction ledger ──────────────────────────────────────────────────────
 
 public record InventoryTransactionDto(

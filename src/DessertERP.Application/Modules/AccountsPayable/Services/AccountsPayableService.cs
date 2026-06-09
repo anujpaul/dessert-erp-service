@@ -1,4 +1,5 @@
 using DessertERP.Application.Common.Interfaces;
+using DessertERP.Application.Common.Services;
 using DessertERP.Application.Modules.AccountsPayable.DTOs;
 using DessertERP.Domain.Modules.AccountsPayable;
 using DessertERP.Domain.Modules.ProductManagement;
@@ -17,6 +18,7 @@ public interface IAccountsPayableService
     // Purchase Orders
     Task<IEnumerable<PurchaseOrderSummaryDto>> GetPurchaseOrdersAsync(string? status = null, Guid? vendorId = null, CancellationToken ct = default);
     Task<PurchaseOrderDto?> GetPurchaseOrderAsync(Guid id, CancellationToken ct = default);
+    Task<IReadOnlyList<DocumentAuditDto>> GetPurchaseOrderHistoryAsync(Guid id, CancellationToken ct = default);
     Task<PurchaseOrderDto> CreatePurchaseOrderAsync(CreatePurchaseOrderRequest req, CancellationToken ct = default);
     Task<PurchaseOrderDto> AddPOLineAsync(Guid poId, AddPOLineRequest req, CancellationToken ct = default);
     Task RemovePOLineAsync(Guid poId, Guid lineId, CancellationToken ct = default);
@@ -101,11 +103,16 @@ public class AccountsPayableService : IAccountsPayableService
 {
     private readonly IAppDbContext _db;
     private readonly ICurrentOrganizationService _org;
+    private readonly IDocumentAuditService _audit;
 
-    public AccountsPayableService(IAppDbContext db, ICurrentOrganizationService org)
+    public AccountsPayableService(
+        IAppDbContext db,
+        ICurrentOrganizationService org,
+        IDocumentAuditService audit)
     {
         _db = db;
         _org = org;
+        _audit = audit;
     }
 
     // Vendors
@@ -191,12 +198,24 @@ public class AccountsPayableService : IAccountsPayableService
         return o is null ? null : ToPODto(o);
     }
 
+    public Task<IReadOnlyList<DocumentAuditDto>> GetPurchaseOrderHistoryAsync(
+        Guid id, CancellationToken ct = default)
+        => _audit.GetAsync("PurchaseOrder", id, ct);
+
     public async Task<PurchaseOrderDto> CreatePurchaseOrderAsync(CreatePurchaseOrderRequest req, CancellationToken ct = default)
     {
         var count = await _db.PurchaseOrders.CountAsync(ct) + 1;
         var po = new PurchaseOrder(_org.OrganizationId, $"PO-{req.OrderDate:yyyy}-{count:D5}",
             req.VendorId, req.OrderDate, req.Description, req.Currency, req.ExpectedDate);
         _db.PurchaseOrders.Add(po);
+        _audit.Add("AP", "Created", po.Id, "PurchaseOrder", null, new
+        {
+            po.PONumber,
+            po.VendorId,
+            po.OrderDate,
+            po.ExpectedDate,
+            po.Currency
+        });
         await _db.SaveChangesAsync(ct);
         return (await GetPurchaseOrderAsync(po.Id, ct))!;
     }
@@ -216,6 +235,15 @@ public class AccountsPayableService : IAccountsPayableService
         var line = po.AddLine(req.ProductVariantId, req.ProductCode, req.Description,
             req.UnitOfMeasure, req.Quantity, req.UnitCost, req.TaxRate);
         _db.PurchaseOrderLines.Add(line);
+        _audit.Add("AP", "Line Added", po.Id, "PurchaseOrder", null, new
+        {
+            LineId = line.Id,
+            line.ProductCode,
+            line.Description,
+            line.OrderedQty,
+            line.UnitCost,
+            line.TaxRate
+        });
         await _db.SaveChangesAsync(ct);
         return (await GetPurchaseOrderAsync(poId, ct))!;
     }
@@ -238,13 +266,24 @@ public class AccountsPayableService : IAccountsPayableService
             .ToListAsync(ct);
         po.RecalcTotalsFromLines(remaining);
 
+        _audit.Add("AP", "Line Removed", po.Id, "PurchaseOrder", new
+        {
+            LineId = line.Id,
+            line.ProductCode,
+            line.Description,
+            line.OrderedQty,
+            line.UnitCost
+        });
         await _db.SaveChangesAsync(ct);
     }
 
     public async Task SendPurchaseOrderAsync(Guid id, CancellationToken ct = default)
     {
         var po = await LoadPOWithLines(id, ct);
+        var oldStatus = po.Status.ToString();
         po.Send();
+        _audit.Add("AP", "Sent to Vendor", po.Id, "PurchaseOrder",
+            new { Status = oldStatus }, new { Status = po.Status.ToString() });
         await _db.SaveChangesAsync(ct);
     }
 
@@ -272,6 +311,14 @@ public class AccountsPayableService : IAccountsPayableService
 
         po.UpdateReceiptStatus();
         _db.PurchaseOrderReceipts.Add(receipt);
+        _audit.Add("AP", "Goods Received", po.Id, "PurchaseOrder", null, new
+        {
+            receipt.ReceiptNumber,
+            receipt.ReceivedDate,
+            Lines = req.Lines.Where(l => l.Qty > 0).Select(l => new { l.LineId, l.Qty }).ToList(),
+            req.Notes,
+            Status = po.Status.ToString()
+        });
         await _db.SaveChangesAsync(ct);
 
         return ToReceiptDto(receipt);
@@ -292,14 +339,20 @@ public class AccountsPayableService : IAccountsPayableService
     public async Task ClosePurchaseOrderAsync(Guid id, CancellationToken ct = default)
     {
         var po = await LoadPOWithLines(id, ct);
+        var oldStatus = po.Status.ToString();
         po.Close();
+        _audit.Add("AP", "Closed", po.Id, "PurchaseOrder",
+            new { Status = oldStatus }, new { Status = po.Status.ToString() });
         await _db.SaveChangesAsync(ct);
     }
 
     public async Task CancelPurchaseOrderAsync(Guid id, CancellationToken ct = default)
     {
         var po = await LoadPOWithLines(id, ct);
+        var oldStatus = po.Status.ToString();
         po.Cancel();
+        _audit.Add("AP", "Cancelled", po.Id, "PurchaseOrder",
+            new { Status = oldStatus }, new { Status = po.Status.ToString() });
         await _db.SaveChangesAsync(ct);
     }
 
@@ -920,6 +973,12 @@ public class AccountsPayableService : IAccountsPayableService
         _db.WorkflowInstances.Add(wi);
         await _db.SaveChangesAsync(ct);
         po.SubmitForApproval(wi.Id);
+        _audit.Add("AP", "Submitted for Approval", po.Id, "PurchaseOrder", null, new
+        {
+            WorkflowInstanceId = wi.Id,
+            SubmittedBy = submittedBy,
+            Status = po.Status.ToString()
+        });
         await _db.SaveChangesAsync(ct);
     }
 
@@ -929,6 +988,8 @@ public class AccountsPayableService : IAccountsPayableService
             .FirstOrDefaultAsync(o => o.WorkflowInstanceId == workflowInstanceId, ct)
             ?? throw new InvalidOperationException("No PO linked to this workflow instance.");
         po.WorkflowApproved();
+        _audit.Add("AP", "Approved", po.Id, "PurchaseOrder", null,
+            new { Status = po.Status.ToString() });
         await _db.SaveChangesAsync(ct);
     }
 
@@ -938,6 +999,8 @@ public class AccountsPayableService : IAccountsPayableService
             .FirstOrDefaultAsync(o => o.WorkflowInstanceId == workflowInstanceId, ct)
             ?? throw new InvalidOperationException("No PO linked to this workflow instance.");
         po.WorkflowRejected(reason);
+        _audit.Add("AP", "Rejected", po.Id, "PurchaseOrder", null,
+            new { Status = po.Status.ToString(), Reason = reason });
         await _db.SaveChangesAsync(ct);
     }
 

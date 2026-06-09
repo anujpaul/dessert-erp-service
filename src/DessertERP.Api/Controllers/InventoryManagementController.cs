@@ -33,11 +33,26 @@ public class InventoryManagementController : ControllerBase
     public async Task<IActionResult> GetItems(
         [FromQuery] string? search = null,
         [FromQuery] string? filter = null,
+        [FromQuery] string? category = null,
+        [FromQuery] string? brand = null,
+        [FromQuery] string? location = null,
+        [FromQuery] decimal? minOnHand = null,
+        [FromQuery] decimal? maxOnHand = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] bool descending = false,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
         CancellationToken ct = default)
     {
-        var items = await _svc.GetItemsAsync(search, filter, ct);
+        var items = await _svc.GetItemsAsync(
+            search, filter, category, brand, location, minOnHand, maxOnHand,
+            sortBy, descending, page, pageSize, ct);
         return Ok(items);
     }
+
+    [HttpGet("filter-options")]
+    public async Task<IActionResult> GetFilterOptions(CancellationToken ct)
+        => Ok(await _svc.GetFilterOptionsAsync(ct));
 
     /// <summary>Get a single inventory record by its ID.</summary>
     [HttpGet("items/{id:guid}")]

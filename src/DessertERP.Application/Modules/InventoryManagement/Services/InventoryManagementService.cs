@@ -10,7 +10,12 @@ namespace DessertERP.Application.Modules.InventoryManagement.Services;
 public interface IInventoryManagementService
 {
     // List / detail
-    Task<IEnumerable<InventoryItemDto>> GetItemsAsync(string? search = null, string? filter = null, CancellationToken ct = default);
+    Task<PagedInventoryItemsDto> GetItemsAsync(
+        string? search = null, string? filter = null, string? category = null,
+        string? brand = null, string? location = null, decimal? minOnHand = null,
+        decimal? maxOnHand = null, string? sortBy = null, bool descending = false,
+        int page = 1, int pageSize = 50, CancellationToken ct = default);
+    Task<InventoryFilterOptionsDto> GetFilterOptionsAsync(CancellationToken ct = default);
     Task<InventoryItemDto>              GetItemAsync(Guid inventoryRecordId, CancellationToken ct = default);
     Task<InventorySummaryDto>           GetSummaryAsync(CancellationToken ct = default);
 
@@ -38,8 +43,11 @@ public class InventoryManagementService : IInventoryManagementService
 
     // ── List / detail ─────────────────────────────────────────────────────────
 
-    public async Task<IEnumerable<InventoryItemDto>> GetItemsAsync(
-        string? search = null, string? filter = null, CancellationToken ct = default)
+    public async Task<PagedInventoryItemsDto> GetItemsAsync(
+        string? search = null, string? filter = null, string? category = null,
+        string? brand = null, string? location = null, decimal? minOnHand = null,
+        decimal? maxOnHand = null, string? sortBy = null, bool descending = false,
+        int page = 1, int pageSize = 50, CancellationToken ct = default)
     {
         var query = _db.InventoryRecords
             .Include(r => r.ProductVariant)
@@ -65,8 +73,67 @@ public class InventoryManagementService : IInventoryManagementService
         else if (filter == "on-order")
             query = query.Where(r => r.QuantityOnOrder > 0);
 
-        var records = await query.OrderBy(r => r.ProductVariant!.Sku).ToListAsync(ct);
-        return records.Select(ToDto);
+        if (!string.IsNullOrWhiteSpace(category))
+            query = query.Where(r => r.ProductVariant!.Product!.Category!.Name == category);
+        if (!string.IsNullOrWhiteSpace(brand))
+            query = query.Where(r => r.ProductVariant!.Product!.Brand!.Name == brand);
+        if (!string.IsNullOrWhiteSpace(location))
+            query = query.Where(r => r.Location == location);
+        if (minOnHand.HasValue)
+            query = query.Where(r => r.QuantityOnHand >= minOnHand.Value);
+        if (maxOnHand.HasValue)
+            query = query.Where(r => r.QuantityOnHand <= maxOnHand.Value);
+
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 10, 200);
+        var totalCount = await query.CountAsync(ct);
+
+        query = (sortBy?.ToLowerInvariant(), descending) switch
+        {
+            ("product", false) => query.OrderBy(r => r.ProductVariant!.Product!.Name),
+            ("product", true) => query.OrderByDescending(r => r.ProductVariant!.Product!.Name),
+            ("onhand", false) => query.OrderBy(r => r.QuantityOnHand),
+            ("onhand", true) => query.OrderByDescending(r => r.QuantityOnHand),
+            ("available", false) => query.OrderBy(r => r.QuantityOnHand - r.QuantityReserved),
+            ("available", true) => query.OrderByDescending(r => r.QuantityOnHand - r.QuantityReserved),
+            ("value", false) => query.OrderBy(r => r.QuantityOnHand * r.AverageCost),
+            ("value", true) => query.OrderByDescending(r => r.QuantityOnHand * r.AverageCost),
+            (_, true) => query.OrderByDescending(r => r.ProductVariant!.Sku),
+            _ => query.OrderBy(r => r.ProductVariant!.Sku)
+        };
+
+        var records = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return new PagedInventoryItemsDto(
+            records.Select(ToDto).ToList(),
+            page,
+            pageSize,
+            totalCount,
+            (int)Math.Ceiling(totalCount / (double)pageSize));
+    }
+
+    public async Task<InventoryFilterOptionsDto> GetFilterOptionsAsync(CancellationToken ct = default)
+    {
+        var categories = await _db.InventoryRecords
+            .AsNoTracking()
+            .Where(r => r.ProductVariant!.Product!.Category != null)
+            .Select(r => r.ProductVariant!.Product!.Category!.Name)
+            .Distinct().OrderBy(x => x).ToListAsync(ct);
+        var brands = await _db.InventoryRecords
+            .AsNoTracking()
+            .Where(r => r.ProductVariant!.Product!.Brand != null)
+            .Select(r => r.ProductVariant!.Product!.Brand!.Name)
+            .Distinct().OrderBy(x => x).ToListAsync(ct);
+        var locations = await _db.InventoryRecords
+            .AsNoTracking()
+            .Where(r => r.Location != null && r.Location != "")
+            .Select(r => r.Location!)
+            .Distinct().OrderBy(x => x).ToListAsync(ct);
+
+        return new InventoryFilterOptionsDto(categories, brands, locations);
     }
 
     public async Task<InventoryItemDto> GetItemAsync(Guid inventoryRecordId, CancellationToken ct = default)
@@ -86,13 +153,13 @@ public class InventoryManagementService : IInventoryManagementService
 
     public async Task<InventorySummaryDto> GetSummaryAsync(CancellationToken ct = default)
     {
-        var records = await _db.InventoryRecords.AsNoTracking().ToListAsync(ct);
+        var records = _db.InventoryRecords.AsNoTracking();
         return new InventorySummaryDto(
-            TotalSkus:       records.Count,
-            LowStockCount:   records.Count(r => r.QuantityOnHand <= r.ReorderPoint && r.QuantityOnHand > 0),
-            OutOfStockCount: records.Count(r => r.QuantityOnHand <= 0),
-            TotalStockValue: records.Sum(r => r.QuantityOnHand * r.AverageCost),
-            OnOrderLines:    records.Count(r => r.QuantityOnOrder > 0)
+            TotalSkus:       await records.CountAsync(ct),
+            LowStockCount:   await records.CountAsync(r => r.QuantityOnHand <= r.ReorderPoint && r.QuantityOnHand > 0, ct),
+            OutOfStockCount: await records.CountAsync(r => r.QuantityOnHand <= 0, ct),
+            TotalStockValue: await records.SumAsync(r => r.QuantityOnHand * r.AverageCost, ct),
+            OnOrderLines:    await records.CountAsync(r => r.QuantityOnOrder > 0, ct)
         );
     }
 

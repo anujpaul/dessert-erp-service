@@ -1,4 +1,5 @@
 using DessertERP.Application.Common.Interfaces;
+using DessertERP.Application.Common.Services;
 using DessertERP.Application.Modules.AccountsReceivable.DTOs;
 using DessertERP.Domain.Modules.AccountsReceivable;
 using DessertERP.Domain.Modules.GeneralLedger;
@@ -19,6 +20,7 @@ public interface IAccountsReceivableService
     // Sales Orders
     Task<IEnumerable<SalesOrderSummaryDto>> GetSalesOrdersAsync(string? status = null, Guid? customerId = null, CancellationToken ct = default);
     Task<SalesOrderDto?> GetSalesOrderAsync(Guid id, CancellationToken ct = default);
+    Task<IReadOnlyList<DocumentAuditDto>> GetSalesOrderHistoryAsync(Guid id, CancellationToken ct = default);
     Task<SalesOrderDto> CreateSalesOrderAsync(CreateSalesOrderRequest req, CancellationToken ct = default);
     Task<SalesOrderDto> AddSalesOrderLineAsync(Guid orderId, AddSalesOrderLineRequest req, CancellationToken ct = default);
     Task<SalesOrderDto> UpdateSalesOrderLineAsync(Guid orderId, Guid lineId, UpdateSalesOrderLineRequest req, CancellationToken ct = default);
@@ -103,11 +105,16 @@ public class AccountsReceivableService : IAccountsReceivableService
 {
     private readonly IAppDbContext _db;
     private readonly ICurrentOrganizationService _org;
+    private readonly IDocumentAuditService _audit;
 
-    public AccountsReceivableService(IAppDbContext db, ICurrentOrganizationService org)
+    public AccountsReceivableService(
+        IAppDbContext db,
+        ICurrentOrganizationService org,
+        IDocumentAuditService audit)
     {
         _db = db;
         _org = org;
+        _audit = audit;
     }
 
     // ── Customers ─────────────────────────────────────────────────────────────
@@ -236,6 +243,10 @@ public class AccountsReceivableService : IAccountsReceivableService
         return o is null ? null : ToSalesOrderDto(o);
     }
 
+    public Task<IReadOnlyList<DocumentAuditDto>> GetSalesOrderHistoryAsync(
+        Guid id, CancellationToken ct = default)
+        => _audit.GetAsync("SalesOrder", id, ct);
+
     public async Task<SalesOrderDto> CreateSalesOrderAsync(CreateSalesOrderRequest req, CancellationToken ct = default)
     {
         var count = await _db.SalesOrders.CountAsync(ct) + 1;
@@ -243,6 +254,14 @@ public class AccountsReceivableService : IAccountsReceivableService
             req.CustomerId, req.OrderDate, req.Description,
             req.CustomerRef, req.Currency, req.RequestedShipDate);
         _db.SalesOrders.Add(order);
+        _audit.Add("AR", "Created", order.Id, "SalesOrder", null, new
+        {
+            order.OrderNumber,
+            order.CustomerId,
+            order.OrderDate,
+            order.RequestedShipDate,
+            order.Currency
+        });
         await _db.SaveChangesAsync(ct);
         return (await GetSalesOrderAsync(order.Id, ct))!;
     }
@@ -275,6 +294,15 @@ public class AccountsReceivableService : IAccountsReceivableService
             string.IsNullOrEmpty(variantDesc) ? null : variantDesc,
             product.UnitOfMeasure, req.Quantity, unitPrice, effectiveTaxRate, req.DiscountPct);
         _db.SalesOrderLines.Add(line);
+        _audit.Add("AR", "Line Added", order.Id, "SalesOrder", null, new
+        {
+            LineId = line.Id,
+            line.Sku,
+            line.ProductName,
+            line.Quantity,
+            line.UnitPrice,
+            line.DiscountPct
+        });
         await _db.SaveChangesAsync(ct);
 
         return (await GetSalesOrderAsync(orderId, ct))!;
@@ -294,6 +322,7 @@ public class AccountsReceivableService : IAccountsReceivableService
             .FirstOrDefaultAsync(l => l.Id == lineId && l.SalesOrderId == orderId && !l.IsDeleted, ct)
             ?? throw new InvalidOperationException("Line not found.");
 
+        var oldLine = new { line.Quantity, line.UnitPrice, line.DiscountPct };
         line.Update(req.Quantity, req.UnitPrice ?? line.UnitPrice, req.DiscountPct ?? line.DiscountPct);
 
         var lines = await _db.SalesOrderLines
@@ -301,6 +330,14 @@ public class AccountsReceivableService : IAccountsReceivableService
             .ToListAsync(ct);
         order.RecalcTotalsFromLines(lines);
 
+        _audit.Add("AR", "Line Updated", order.Id, "SalesOrder", oldLine, new
+        {
+            LineId = line.Id,
+            line.Sku,
+            line.Quantity,
+            line.UnitPrice,
+            line.DiscountPct
+        });
         await _db.SaveChangesAsync(ct);
         return (await GetSalesOrderAsync(orderId, ct))!;
     }
@@ -326,6 +363,14 @@ public class AccountsReceivableService : IAccountsReceivableService
             .ToListAsync(ct);
         order.RecalcTotalsFromLines(remaining);
 
+        _audit.Add("AR", "Line Removed", order.Id, "SalesOrder", new
+        {
+            LineId = line.Id,
+            line.Sku,
+            line.ProductName,
+            line.Quantity,
+            line.UnitPrice
+        });
         await _db.SaveChangesAsync(ct);
     }
 
@@ -345,6 +390,7 @@ public class AccountsReceivableService : IAccountsReceivableService
         var lines = await _db.SalesOrderLines
             .Where(l => l.SalesOrderId == orderId && !l.IsDeleted)
             .ToListAsync(ct);
+        var oldDiscounts = lines.Select(l => new { LineId = l.Id, l.DiscountPct }).ToList();
 
         foreach (var line in lines)
             line.Update(line.Quantity, line.UnitPrice, discountPct);
@@ -352,6 +398,7 @@ public class AccountsReceivableService : IAccountsReceivableService
         // Recalculate order-level totals from the updated lines.
         order.RecalcTotalsFromLines(lines);
 
+        _audit.Add("AR", "Discount Applied", order.Id, "SalesOrder", oldDiscounts, new { DiscountPct = discountPct });
         await _db.SaveChangesAsync(ct);
 
         return (await GetSalesOrderAsync(orderId, ct))!;
@@ -360,33 +407,52 @@ public class AccountsReceivableService : IAccountsReceivableService
     public async Task ConfirmSalesOrderAsync(Guid id, ConfirmSalesOrderRequest req, CancellationToken ct = default)
     {
         var order = await LoadOrderWithLines(id, ct);
+        var oldStatus = order.Status.ToString();
         order.Confirm();
         await ReserveSalesOrderInventoryAsync(order, req.BackorderLimit, ct);
+        _audit.Add("AR", "Confirmed", order.Id, "SalesOrder",
+            new { Status = oldStatus },
+            new { Status = order.Status.ToString(), req.BackorderLimit });
         await _db.SaveChangesAsync(ct);
     }
 
     public async Task StartPickingAsync(Guid id, CancellationToken ct = default)
     {
         var order = await LoadOrderWithLines(id, ct);
+        var oldStatus = order.Status.ToString();
         order.StartPicking();
+        _audit.Add("AR", "Picking Started", order.Id, "SalesOrder",
+            new { Status = oldStatus }, new { Status = order.Status.ToString() });
         await _db.SaveChangesAsync(ct);
     }
 
     public async Task ShipSalesOrderAsync(Guid id, ShipOrderRequest req, CancellationToken ct = default)
     {
         var order = await LoadOrderWithLines(id, ct);
+        var oldStatus = order.Status.ToString();
         var fullyShipped = await ShipSalesOrderInventoryAsync(order, req, ct);
         order.Ship(req.ShipDate ?? DateTime.UtcNow, fullyShipped);
+        _audit.Add("AR", fullyShipped ? "Shipped" : "Partially Shipped", order.Id, "SalesOrder",
+            new { Status = oldStatus },
+            new
+            {
+                Status = order.Status.ToString(),
+                ShipDate = req.ShipDate ?? DateTime.UtcNow,
+                Lines = (req.Lines ?? []).Select(l => new { l.LineId, l.Quantity }).ToList()
+            });
         await _db.SaveChangesAsync(ct);
     }
 
     public async Task CancelSalesOrderAsync(Guid id, CancellationToken ct = default)
     {
         var order = await LoadOrderWithLines(id, ct);
+        var oldStatus = order.Status.ToString();
         var shouldReleaseInventory = order.Status is SalesOrderStatus.Confirmed or SalesOrderStatus.Picking;
         order.Cancel();
         if (shouldReleaseInventory)
             await ReleaseSalesOrderInventoryAsync(order, ct);
+        _audit.Add("AR", "Cancelled", order.Id, "SalesOrder",
+            new { Status = oldStatus }, new { Status = order.Status.ToString() });
         await _db.SaveChangesAsync(ct);
     }
 
@@ -1152,6 +1218,12 @@ public class AccountsReceivableService : IAccountsReceivableService
         await _db.SaveChangesAsync(ct);
 
         order.SubmitForApproval(wf.Id);
+        _audit.Add("AR", "Submitted for Approval", order.Id, "SalesOrder", null, new
+        {
+            WorkflowInstanceId = wf.Id,
+            SubmittedBy = submittedBy,
+            Status = order.Status.ToString()
+        });
         await _db.SaveChangesAsync(ct);
         return (await GetSalesOrderAsync(id, ct))!;
     }
@@ -1164,6 +1236,8 @@ public class AccountsReceivableService : IAccountsReceivableService
             ?? throw new InvalidOperationException("Sales order not found.");
         order.WorkflowApproved();
         await ReserveSalesOrderInventoryAsync(order, 0m, ct);
+        _audit.Add("AR", "Approved", order.Id, "SalesOrder", null,
+            new { Status = order.Status.ToString() });
         await _db.SaveChangesAsync(ct);
         return (await GetSalesOrderAsync(id, ct))!;
     }
@@ -1174,6 +1248,8 @@ public class AccountsReceivableService : IAccountsReceivableService
             .FirstOrDefaultAsync(o => o.Id == id && !o.IsDeleted, ct)
             ?? throw new InvalidOperationException("Sales order not found.");
         order.WorkflowRejected(reason);
+        _audit.Add("AR", "Rejected", order.Id, "SalesOrder", null,
+            new { Status = order.Status.ToString(), Reason = reason });
         await _db.SaveChangesAsync(ct);
         return (await GetSalesOrderAsync(id, ct))!;
     }
@@ -1184,6 +1260,11 @@ public class AccountsReceivableService : IAccountsReceivableService
             .FirstOrDefaultAsync(o => o.Id == id && !o.IsDeleted, ct)
             ?? throw new InvalidOperationException("Sales order not found.");
         order.ConfirmDelivery(req.DeliveredAt ?? DateTime.UtcNow, req.Reference);
+        _audit.Add("AR", "Delivery Confirmed", order.Id, "SalesOrder", null, new
+        {
+            DeliveredAt = req.DeliveredAt ?? DateTime.UtcNow,
+            req.Reference
+        });
         await _db.SaveChangesAsync(ct);
         return (await GetSalesOrderAsync(id, ct))!;
     }

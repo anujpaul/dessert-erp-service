@@ -334,6 +334,7 @@ public class AccountsReceivableService : IAccountsReceivableService
     {
         var order = await LoadOrderWithLines(id, ct);
         order.Confirm();
+        await ReserveSalesOrderInventoryAsync(order, ct);
         await _db.SaveChangesAsync(ct);
     }
 
@@ -348,13 +349,17 @@ public class AccountsReceivableService : IAccountsReceivableService
     {
         var order = await LoadOrderWithLines(id, ct);
         order.Ship(req.ShipDate);
+        await ShipSalesOrderInventoryAsync(order, ct);
         await _db.SaveChangesAsync(ct);
     }
 
     public async Task CancelSalesOrderAsync(Guid id, CancellationToken ct = default)
     {
         var order = await LoadOrderWithLines(id, ct);
+        var shouldReleaseInventory = order.Status is SalesOrderStatus.Confirmed or SalesOrderStatus.Picking;
         order.Cancel();
+        if (shouldReleaseInventory)
+            await ReleaseSalesOrderInventoryAsync(order, ct);
         await _db.SaveChangesAsync(ct);
     }
 
@@ -637,6 +642,91 @@ public class AccountsReceivableService : IAccountsReceivableService
             ?? throw new InvalidOperationException("Sales order not found.");
     }
 
+    private async Task ReserveSalesOrderInventoryAsync(SalesOrder order, CancellationToken ct)
+    {
+        var records = await LoadInventoryRecordsForOrderAsync(order, ct);
+
+        foreach (var lineGroup in ActiveOrderLineQuantities(order))
+        {
+            var record = records[lineGroup.ProductVariantId];
+            record.Reserve(lineGroup.Quantity);
+            AddInventoryTransaction(order, record, InventoryTransactionType.SaleCommit,
+                lineGroup.Quantity, $"Reserved for sales order {order.OrderNumber}.");
+        }
+    }
+
+    private async Task ReleaseSalesOrderInventoryAsync(SalesOrder order, CancellationToken ct)
+    {
+        var records = await LoadInventoryRecordsForOrderAsync(order, ct);
+
+        foreach (var lineGroup in ActiveOrderLineQuantities(order))
+        {
+            var record = records[lineGroup.ProductVariantId];
+            record.Unreserve(lineGroup.Quantity);
+            AddInventoryTransaction(order, record, InventoryTransactionType.SaleUncommit,
+                -lineGroup.Quantity, $"Released reservation for sales order {order.OrderNumber}.");
+        }
+    }
+
+    private async Task ShipSalesOrderInventoryAsync(SalesOrder order, CancellationToken ct)
+    {
+        var records = await LoadInventoryRecordsForOrderAsync(order, ct);
+
+        foreach (var lineGroup in ActiveOrderLineQuantities(order))
+        {
+            var record = records[lineGroup.ProductVariantId];
+            record.IssueStock(lineGroup.Quantity);
+            record.Unreserve(lineGroup.Quantity);
+            AddInventoryTransaction(order, record, InventoryTransactionType.SaleShipment,
+                -lineGroup.Quantity, $"Shipped sales order {order.OrderNumber}.");
+        }
+    }
+
+    private async Task<Dictionary<Guid, InventoryRecord>> LoadInventoryRecordsForOrderAsync(
+        SalesOrder order, CancellationToken ct)
+    {
+        var lineQuantities = ActiveOrderLineQuantities(order).ToList();
+        var variantIds = lineQuantities.Select(l => l.ProductVariantId).ToList();
+
+        var records = await _db.InventoryRecords
+            .Where(r => variantIds.Contains(r.ProductVariantId))
+            .ToDictionaryAsync(r => r.ProductVariantId, ct);
+
+        var missingSku = order.Lines
+            .Where(l => !l.IsDeleted && !records.ContainsKey(l.ProductVariantId))
+            .Select(l => l.Sku)
+            .FirstOrDefault();
+        if (missingSku is not null)
+            throw new InvalidOperationException($"Inventory record not found for SKU {missingSku}.");
+
+        return records;
+    }
+
+    private static IEnumerable<(Guid ProductVariantId, decimal Quantity)> ActiveOrderLineQuantities(SalesOrder order) =>
+        order.Lines
+            .Where(l => !l.IsDeleted)
+            .GroupBy(l => l.ProductVariantId)
+            .Select(g => (ProductVariantId: g.Key, Quantity: g.Sum(l => l.Quantity)));
+
+    private void AddInventoryTransaction(
+        SalesOrder order,
+        InventoryRecord record,
+        InventoryTransactionType transactionType,
+        decimal quantity,
+        string notes)
+    {
+        _db.InventoryTransactions.Add(new InventoryTransaction(
+            record.OrganizationId,
+            record.ProductVariantId,
+            transactionType,
+            quantity,
+            record.AverageCost,
+            record.QuantityOnHand,
+            referenceNumber: order.OrderNumber,
+            referenceDocumentId: order.Id,
+            notes: notes));
+    }
+
     private static CustomerDto ToCustomerDto(Customer c, decimal outstanding) =>
         new(c.Id, c.CustomerNumber, c.Name, c.Email, c.Phone,
             c.BillingAddress, c.ShippingAddress, c.Website, c.Notes,
@@ -883,9 +973,11 @@ public class AccountsReceivableService : IAccountsReceivableService
     public async Task<SalesOrderDto> ApproveSOAsync(Guid id, CancellationToken ct = default)
     {
         var order = await _db.SalesOrders
+            .Include(o => o.Lines)
             .FirstOrDefaultAsync(o => o.Id == id && !o.IsDeleted, ct)
             ?? throw new InvalidOperationException("Sales order not found.");
         order.WorkflowApproved();
+        await ReserveSalesOrderInventoryAsync(order, ct);
         await _db.SaveChangesAsync(ct);
         return (await GetSalesOrderAsync(id, ct))!;
     }

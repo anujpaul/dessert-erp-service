@@ -93,12 +93,16 @@ public class InventoryRecord : BaseEntity
 
     public void Reserve(decimal quantity)
     {
+        if (quantity <= 0) throw new InvalidOperationException("Reserved quantity must be positive.");
+        if (quantity > QuantityAvailable)
+            throw new InvalidOperationException($"Cannot reserve {quantity} - only {QuantityAvailable} available.");
         QuantityReserved += quantity;
         SetUpdated();
     }
 
     public void Unreserve(decimal quantity)
     {
+        if (quantity <= 0) throw new InvalidOperationException("Unreserved quantity must be positive.");
         QuantityReserved = Math.Max(0, QuantityReserved - quantity);
         SetUpdated();
     }

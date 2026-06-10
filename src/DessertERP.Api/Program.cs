@@ -206,7 +206,26 @@ using (var scope = app.Services.CreateScope())
 {
     var db     = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    await DatabaseSeeder.SeedAsync(db, logger);
+
+    if (builder.Configuration.GetValue("DatabaseInitialization:ApplyMigrationsOnStartup", true))
+    {
+        var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        await db.Database.MigrateAsync();
+        logger.LogInformation(
+            "Database migrations completed in {ElapsedMs} ms.",
+            System.Diagnostics.Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+    }
+
+    if (builder.Configuration.GetValue(
+            "DatabaseInitialization:SeedOnStartup",
+            app.Environment.IsDevelopment()))
+    {
+        var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        await DatabaseSeeder.SeedAsync(db, logger);
+        logger.LogInformation(
+            "Database seeding completed in {ElapsedMs} ms.",
+            System.Diagnostics.Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+    }
 
     // Register the import sweep job once at startup
     var recurring = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();

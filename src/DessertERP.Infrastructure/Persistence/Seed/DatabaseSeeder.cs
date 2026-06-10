@@ -15,8 +15,6 @@ public static class DatabaseSeeder
 {
     public static async Task SeedAsync(AppDbContext db, ILogger logger)
     {
-        await db.Database.MigrateAsync();
-
         await SeedAccountTypesAsync(db, logger);
         var orgId = await SeedDefaultOrganizationAsync(db, logger);
         await SeedChartOfAccountsAsync(db, logger, orgId);

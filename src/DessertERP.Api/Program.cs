@@ -171,11 +171,25 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // ── CORS (Angular dev server) ─────────────────────────────────────────────────
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>()
+    ?.Where(origin => !string.IsNullOrWhiteSpace(origin))
+    .Select(origin => origin.TrimEnd('/'))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray() ?? [];
+
+if (allowedOrigins.Length == 0)
+{
+    throw new InvalidOperationException(
+        "At least one CORS origin must be configured in Cors:AllowedOrigins.");
+}
+
 builder.Services.AddCors(options =>
-    options.AddPolicy("AllowAngular", policy =>
-        policy.WithOrigins("http://localhost:4200",
-                            "https://dessert-erp.azurewebsites.net")
-              .AllowAnyHeader().AllowAnyMethod()));
+    options.AddPolicy("AllowFrontend", policy =>
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod()));
 
 var app = builder.Build();
 
@@ -197,6 +211,10 @@ using (var scope = app.Services.CreateScope())
 // ── Middleware ────────────────────────────────────────────────────────────────
 //app.UseDeveloperExceptionPage(); // full stack trace in response — remove before production
 
+// Keep CORS outside the exception handler so handled application errors also
+// include the appropriate Access-Control-Allow-Origin response header.
+app.UseCors("AllowFrontend");
+
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
@@ -209,9 +227,13 @@ else
     app.UseHsts();
 }
 
-app.UseCors("AllowAngular");
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapGet("/health", () => Results.Ok(new
+{
+    status = "Healthy",
+    timestampUtc = DateTimeOffset.UtcNow
+})).AllowAnonymous();
 app.MapControllers();
 
 // Hangfire dashboard (restrict in production as needed)

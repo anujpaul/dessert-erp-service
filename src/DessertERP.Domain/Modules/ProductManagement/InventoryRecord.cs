@@ -115,6 +115,12 @@ public class InventoryRecord : BaseEntity
         SetUpdated();
     }
 
+    public void AdjustOnOrder(decimal delta)
+    {
+        QuantityOnOrder = Math.Max(0, QuantityOnOrder + delta);
+        SetUpdated();
+    }
+
     public void SetThresholds(decimal reorderPoint, decimal minimumStock, decimal maximumStock,
         string? location = null)
     {

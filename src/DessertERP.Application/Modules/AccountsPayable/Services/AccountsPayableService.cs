@@ -2,6 +2,7 @@ using DessertERP.Application.Common.Interfaces;
 using DessertERP.Application.Common.Services;
 using DessertERP.Domain.Common;
 using DessertERP.Application.Modules.AccountsPayable.DTOs;
+using DessertERP.Application.Modules.InventoryManagement.Services;
 using DessertERP.Domain.Modules.AccountsPayable;
 using DessertERP.Domain.Modules.ProductManagement;
 using Microsoft.EntityFrameworkCore;
@@ -105,15 +106,18 @@ public class AccountsPayableService : IAccountsPayableService
     private readonly IAppDbContext _db;
     private readonly ICurrentOrganizationService _org;
     private readonly IDocumentAuditService _audit;
+    private readonly IPurchaseInventoryPostingService _inventoryPosting;
 
     public AccountsPayableService(
         IAppDbContext db,
         ICurrentOrganizationService org,
-        IDocumentAuditService audit)
+        IDocumentAuditService audit,
+        IPurchaseInventoryPostingService inventoryPosting)
     {
         _db = db;
         _org = org;
         _audit = audit;
+        _inventoryPosting = inventoryPosting;
     }
 
     // Vendors
@@ -290,6 +294,7 @@ public class AccountsPayableService : IAccountsPayableService
         var po = await LoadPOWithLines(id, ct);
         var oldStatus = po.Status.ToString();
         po.Send();
+        await AddPurchaseOrderToInventoryAsync(po, ct);
         _audit.Add("AP", "Sent to Vendor", po.Id, "PurchaseOrder",
             new { Status = oldStatus }, new { Status = po.Status.ToString() });
         await _db.SaveChangesAsync(ct);
@@ -315,7 +320,23 @@ public class AccountsPayableService : IAccountsPayableService
                 ?? throw new InvalidOperationException($"PO line {lineReq.LineId} not found.");
             poLine.Receive(lineReq.Qty);
             receipt.AddLine(poLine.Id, lineReq.Qty);
+
         }
+
+        await _inventoryPosting.PostReceiptAsync(
+            po.OrganizationId,
+            po.Id,
+            po.PONumber,
+            receipt.ReceiptNumber,
+            req.Lines
+                .Where(line => line.Qty > 0)
+                .Select(line =>
+                {
+                    var poLine = po.Lines.First(existing => existing.Id == line.LineId);
+                    return new PurchaseInventoryLine(poLine.ProductVariantId, line.Qty, poLine.UnitCost);
+                }),
+            req.Notes,
+            ct);
 
         po.UpdateReceiptStatus();
         _db.PurchaseOrderReceipts.Add(receipt);
@@ -348,6 +369,7 @@ public class AccountsPayableService : IAccountsPayableService
     {
         var po = await LoadPOWithLines(id, ct);
         var oldStatus = po.Status.ToString();
+        await RemoveOutstandingPurchaseOrderInventoryAsync(po, ct);
         po.Close();
         _audit.Add("AP", "Closed", po.Id, "PurchaseOrder",
             new { Status = oldStatus }, new { Status = po.Status.ToString() });
@@ -358,6 +380,7 @@ public class AccountsPayableService : IAccountsPayableService
     {
         var po = await LoadPOWithLines(id, ct);
         var oldStatus = po.Status.ToString();
+        await RemoveOutstandingPurchaseOrderInventoryAsync(po, ct);
         po.Cancel();
         _audit.Add("AP", "Cancelled", po.Id, "PurchaseOrder",
             new { Status = oldStatus }, new { Status = po.Status.ToString() });
@@ -1003,10 +1026,11 @@ public class AccountsPayableService : IAccountsPayableService
 
     public async Task POWorkflowApprovedAsync(Guid workflowInstanceId, CancellationToken ct = default)
     {
-        var po = await _db.PurchaseOrders.IgnoreQueryFilters()
+        var po = await _db.PurchaseOrders.IgnoreQueryFilters().Include(o => o.Lines)
             .FirstOrDefaultAsync(o => o.WorkflowInstanceId == workflowInstanceId, ct)
             ?? throw new InvalidOperationException("No PO linked to this workflow instance.");
         po.WorkflowApproved();
+        await AddPurchaseOrderToInventoryAsync(po, ct);
         _audit.Add("AP", "Approved", po.Id, "PurchaseOrder", null,
             new { Status = po.Status.ToString() });
         await _db.SaveChangesAsync(ct);
@@ -1021,6 +1045,35 @@ public class AccountsPayableService : IAccountsPayableService
         _audit.Add("AP", "Rejected", po.Id, "PurchaseOrder", null,
             new { Status = po.Status.ToString(), Reason = reason });
         await _db.SaveChangesAsync(ct);
+    }
+
+    private async Task AddPurchaseOrderToInventoryAsync(PurchaseOrder po, CancellationToken ct)
+    {
+        await _inventoryPosting.PostPurchaseOrderAsync(
+            po.OrganizationId,
+            po.Id,
+            po.PONumber,
+            po.Lines
+                .Where(line => !line.IsDeleted && line.OutstandingQty > 0)
+                .Select(line => new PurchaseInventoryLine(
+                    line.ProductVariantId, line.OutstandingQty, line.UnitCost)),
+            ct);
+    }
+
+    private async Task RemoveOutstandingPurchaseOrderInventoryAsync(PurchaseOrder po, CancellationToken ct)
+    {
+        if (po.Status != PurchaseOrderStatus.Sent && po.Status != PurchaseOrderStatus.PartiallyReceived)
+            return;
+
+        await _inventoryPosting.ReleaseOutstandingAsync(
+            po.OrganizationId,
+            po.Id,
+            po.PONumber,
+            po.Lines
+                .Where(line => !line.IsDeleted && line.OutstandingQty > 0)
+                .Select(line => new PurchaseInventoryLine(
+                    line.ProductVariantId, line.OutstandingQty, line.UnitCost)),
+            ct);
     }
 
     // ── Invoice Workflow ──────────────────────────────────────────────────────

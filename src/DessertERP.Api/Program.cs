@@ -73,6 +73,7 @@ builder.Services.AddScoped<IAccountsReceivableService, AccountsReceivableService
 builder.Services.AddScoped<IAccountsPayableService, AccountsPayableService>();
 builder.Services.AddScoped<IProductManagementService, ProductManagementService>();
 builder.Services.AddScoped<IInventoryManagementService, InventoryManagementService>();
+builder.Services.AddScoped<IPurchaseInventoryPostingService, PurchaseInventoryPostingService>();
 builder.Services.AddScoped<IWorkflowService, WorkflowService>();
 builder.Services.AddScoped<IExpenseService, ExpenseService>();
 builder.Services.AddScoped<IWarehouseManagementService, WarehouseManagementService>();

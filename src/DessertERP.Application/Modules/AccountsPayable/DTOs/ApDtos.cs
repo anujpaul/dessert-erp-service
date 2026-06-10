@@ -74,14 +74,15 @@ public record PurchaseOrderSummaryDto(Guid Id, string PONumber, Guid VendorId,
     int LineCount, DateTime CreatedAt);
 
 public record PurchaseOrderDto(Guid Id, string PONumber, Guid VendorId, string VendorName,
-    DateTime OrderDate, DateTime? ExpectedDate, string Description, string Currency,
+    DateTime OrderDate, DateTime? ExpectedDate, Guid? WarehouseId, string? WarehouseName,
+    string Description, string Currency,
     string Status, string InvoiceStatus, decimal SubTotal, decimal TaxTotal, decimal GrandTotal,
     decimal InvoicedAmount, bool CanReceive, DateTime CreatedAt,
     IReadOnlyList<PurchaseOrderLineDto> Lines);
 
 public record CreatePurchaseOrderRequest(
     Guid VendorId, DateTime OrderDate, string Description,
-    string Currency = "USD", DateTime? ExpectedDate = null);
+    string Currency = "USD", DateTime? ExpectedDate = null, Guid? WarehouseId = null);
 
 // AddPOLineRequest now requires a ProductVariantId — links the line to the product catalog
 public record AddPOLineRequest(
@@ -99,6 +100,8 @@ public record ReceiveLineRequest(Guid LineId, decimal Qty);
 /// <summary>Request to record a goods receipt against a PO (may be partial).</summary>
 public record RecordReceiptRequest(
     IReadOnlyList<ReceiveLineRequest> Lines,
+    Guid WarehouseId,
+    Guid WarehouseLocationId,
     DateTime? ReceivedDate = null,
     string? Notes = null);
 
@@ -106,6 +109,8 @@ public record RecordReceiptRequest(
 public record ReceiptLineDto(Guid Id, Guid PurchaseOrderLineId, string ProductCode, string Description, decimal Qty);
 
 public record ReceiptDto(Guid Id, string ReceiptNumber, DateTime ReceivedDate,
+    Guid? WarehouseId, string WarehouseName,
+    Guid? WarehouseLocationId, string WarehouseLocationCode,
     string? Notes, DateTime CreatedAt, IReadOnlyList<ReceiptLineDto> Lines);
 
 // ── AP Invoice ────────────────────────────────────────────────────────────────

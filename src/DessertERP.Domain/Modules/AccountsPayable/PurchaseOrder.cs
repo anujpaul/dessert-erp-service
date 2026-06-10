@@ -1,6 +1,7 @@
 using DessertERP.Domain.Common;
 
 namespace DessertERP.Domain.Modules.AccountsPayable;
+using DessertERP.Domain.Modules.WarehouseManagement;
 
 /// <summary>Lifecycle status — tracks physical receipt progress.</summary>
 public enum PurchaseOrderStatus { Draft, PendingApproval, Sent, PartiallyReceived, FullyReceived, Closed, Cancelled }
@@ -15,6 +16,7 @@ public class PurchaseOrder : BaseEntity
     public Guid VendorId { get; private set; }
     public DateTime OrderDate { get; private set; }
     public DateTime? ExpectedDate { get; private set; }
+    public Guid? WarehouseId { get; private set; }
     public string Description { get; private set; } = string.Empty;
     public string Currency { get; private set; } = "USD";
     public PurchaseOrderStatus Status { get; private set; } = PurchaseOrderStatus.Draft;
@@ -35,6 +37,7 @@ public class PurchaseOrder : BaseEntity
     public DateTime? ExportedAt { get; private set; }
 
     public Vendor? Vendor { get; private set; }
+    public Warehouse? Warehouse { get; private set; }
 
     private readonly List<PurchaseOrderLine> _lines = new();
     public IReadOnlyCollection<PurchaseOrderLine> Lines => _lines.AsReadOnly();
@@ -45,7 +48,8 @@ public class PurchaseOrder : BaseEntity
     private PurchaseOrder() { }
 
     public PurchaseOrder(Guid organizationId, string poNumber, Guid vendorId, DateTime orderDate,
-        string description, string currency = "USD", DateTime? expectedDate = null)
+        string description, string currency = "USD", DateTime? expectedDate = null,
+        Guid? warehouseId = null)
     {
         OrganizationId = organizationId;
         PONumber = poNumber;
@@ -54,6 +58,7 @@ public class PurchaseOrder : BaseEntity
         Description = description;
         Currency = currency;
         ExpectedDate = expectedDate;
+        WarehouseId = warehouseId;
     }
 
     // ── Receiving ─────────────────────────────────────────────────────────────

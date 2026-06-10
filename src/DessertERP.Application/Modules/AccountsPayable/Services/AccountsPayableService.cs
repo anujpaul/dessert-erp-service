@@ -180,7 +180,7 @@ public class AccountsPayableService : IAccountsPayableService
         string? status = null, Guid? vendorId = null, CancellationToken ct = default)
     {
         var query = _db.PurchaseOrders
-            .Include(o => o.Vendor).Include(o => o.Lines)
+            .Include(o => o.Vendor).Include(o => o.Warehouse).Include(o => o.Lines)
             .Where(o => !o.IsDeleted);
 
         if (!string.IsNullOrEmpty(status) && Enum.TryParse<PurchaseOrderStatus>(status, out var s))
@@ -198,7 +198,7 @@ public class AccountsPayableService : IAccountsPayableService
     public async Task<PurchaseOrderDto?> GetPurchaseOrderAsync(Guid id, CancellationToken ct = default)
     {
         var o = await _db.PurchaseOrders
-            .Include(o => o.Vendor).Include(o => o.Lines)
+            .Include(o => o.Vendor).Include(o => o.Warehouse).Include(o => o.Lines)
             .FirstOrDefaultAsync(o => o.Id == id && !o.IsDeleted, ct);
         return o is null ? null : ToPODto(o);
     }
@@ -209,9 +209,18 @@ public class AccountsPayableService : IAccountsPayableService
 
     public async Task<PurchaseOrderDto> CreatePurchaseOrderAsync(CreatePurchaseOrderRequest req, CancellationToken ct = default)
     {
+        if (req.WarehouseId.HasValue)
+        {
+            var validWarehouse = await _db.Warehouses.AnyAsync(
+                warehouse => warehouse.Id == req.WarehouseId.Value && warehouse.IsActive, ct);
+            if (!validWarehouse)
+                throw new InvalidOperationException("The selected destination warehouse is not active.");
+        }
+
         var count = await _db.PurchaseOrders.CountAsync(ct) + 1;
         var po = new PurchaseOrder(_org.OrganizationId, $"PO-{req.OrderDate:yyyy}-{count:D5}",
-            req.VendorId, req.OrderDate, req.Description, req.Currency, req.ExpectedDate);
+            req.VendorId, req.OrderDate, req.Description, req.Currency, req.ExpectedDate,
+            req.WarehouseId);
         _db.PurchaseOrders.Add(po);
         _audit.Add("AP", "Created", po.Id, "PurchaseOrder", null, new
         {
@@ -219,6 +228,7 @@ public class AccountsPayableService : IAccountsPayableService
             po.VendorId,
             po.OrderDate,
             po.ExpectedDate,
+            po.WarehouseId,
             po.Currency
         });
         await _db.SaveChangesAsync(ct);
@@ -311,7 +321,8 @@ public class AccountsPayableService : IAccountsPayableService
         var receiptDate = req.ReceivedDate?.Date ?? DateTime.UtcNow.Date;
         var receipt = new PurchaseOrderReceipt(
             po.OrganizationId, po.Id,
-            $"GRN-{count:D6}", receiptDate, req.Notes);
+            $"GRN-{count:D6}", receiptDate, req.WarehouseId,
+            req.WarehouseLocationId, req.Notes);
 
         foreach (var lineReq in req.Lines)
         {
@@ -328,6 +339,8 @@ public class AccountsPayableService : IAccountsPayableService
             po.Id,
             po.PONumber,
             receipt.ReceiptNumber,
+            req.WarehouseId,
+            req.WarehouseLocationId,
             req.Lines
                 .Where(line => line.Qty > 0)
                 .Select(line =>
@@ -344,13 +357,21 @@ public class AccountsPayableService : IAccountsPayableService
         {
             receipt.ReceiptNumber,
             receipt.ReceivedDate,
+            receipt.WarehouseId,
+            receipt.WarehouseLocationId,
             Lines = req.Lines.Where(l => l.Qty > 0).Select(l => new { l.LineId, l.Qty }).ToList(),
             req.Notes,
             Status = po.Status.ToString()
         });
         await _db.SaveChangesAsync(ct);
 
-        return ToReceiptDto(receipt);
+        var savedReceipt = await _db.PurchaseOrderReceipts
+            .Include(item => item.Lines)
+                .ThenInclude(line => line.PurchaseOrderLine)
+            .Include(item => item.Warehouse)
+            .Include(item => item.WarehouseLocation)
+            .FirstAsync(item => item.Id == receipt.Id, ct);
+        return ToReceiptDto(savedReceipt);
     }
 
     public async Task<IEnumerable<ReceiptDto>> GetReceiptsAsync(Guid poId, CancellationToken ct = default)
@@ -358,6 +379,8 @@ public class AccountsPayableService : IAccountsPayableService
         var receipts = await _db.PurchaseOrderReceipts
             .Include(r => r.Lines)
                 .ThenInclude(l => l.PurchaseOrderLine)
+            .Include(r => r.Warehouse)
+            .Include(r => r.WarehouseLocation)
             .Where(r => r.PurchaseOrderId == poId && !r.IsDeleted)
             .OrderByDescending(r => r.ReceivedDate)
             .ToListAsync(ct);
@@ -832,7 +855,8 @@ public class AccountsPayableService : IAccountsPayableService
 
     private static PurchaseOrderDto ToPODto(PurchaseOrder o) =>
         new(o.Id, o.PONumber, o.VendorId, o.Vendor?.Name ?? string.Empty,
-            o.OrderDate, o.ExpectedDate, o.Description, o.Currency,
+            o.OrderDate, o.ExpectedDate, o.WarehouseId, o.Warehouse?.Name,
+            o.Description, o.Currency,
             o.Status.ToString(), o.InvoiceStatus.ToString(),
             o.SubTotal, o.TaxTotal, o.GrandTotal, o.InvoicedAmount,
             o.CanReceive, o.CreatedAt,
@@ -843,7 +867,10 @@ public class AccountsPayableService : IAccountsPayableService
                 l.IsFullyReceived, l.OutstandingQty)).ToList());
 
     private static ReceiptDto ToReceiptDto(PurchaseOrderReceipt r) =>
-        new(r.Id, r.ReceiptNumber, r.ReceivedDate, r.Notes, r.CreatedAt,
+        new(r.Id, r.ReceiptNumber, r.ReceivedDate,
+            r.WarehouseId, r.Warehouse?.Name ?? string.Empty,
+            r.WarehouseLocationId, r.WarehouseLocation?.Code ?? string.Empty,
+            r.Notes, r.CreatedAt,
             r.Lines.Select(l => new ReceiptLineDto(
                 l.Id, l.PurchaseOrderLineId,
                 l.PurchaseOrderLine?.ProductCode ?? string.Empty,

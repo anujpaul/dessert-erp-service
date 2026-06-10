@@ -1,6 +1,7 @@
 using DessertERP.Domain.Common;
 
 namespace DessertERP.Domain.Modules.AccountsPayable;
+using DessertERP.Domain.Modules.WarehouseManagement;
 
 /// <summary>
 /// Records a single goods-receipt event against a PO.
@@ -12,9 +13,13 @@ public class PurchaseOrderReceipt : BaseEntity
     public Guid PurchaseOrderId { get; private set; }
     public string ReceiptNumber { get; private set; } = string.Empty;
     public DateTime ReceivedDate { get; private set; }
+    public Guid? WarehouseId { get; private set; }
+    public Guid? WarehouseLocationId { get; private set; }
     public string? Notes { get; private set; }
 
     public PurchaseOrder? PurchaseOrder { get; private set; }
+    public Warehouse? Warehouse { get; private set; }
+    public WarehouseLocation? WarehouseLocation { get; private set; }
 
     private readonly List<PurchaseOrderReceiptLine> _lines = new();
     public IReadOnlyCollection<PurchaseOrderReceiptLine> Lines => _lines.AsReadOnly();
@@ -22,12 +27,15 @@ public class PurchaseOrderReceipt : BaseEntity
     private PurchaseOrderReceipt() { }
 
     public PurchaseOrderReceipt(Guid organizationId, Guid purchaseOrderId,
-        string receiptNumber, DateTime receivedDate, string? notes = null)
+        string receiptNumber, DateTime receivedDate, Guid warehouseId,
+        Guid warehouseLocationId, string? notes = null)
     {
         OrganizationId  = organizationId;
         PurchaseOrderId = purchaseOrderId;
         ReceiptNumber   = receiptNumber;
         ReceivedDate    = receivedDate;
+        WarehouseId = warehouseId;
+        WarehouseLocationId = warehouseLocationId;
         Notes           = notes;
     }
 

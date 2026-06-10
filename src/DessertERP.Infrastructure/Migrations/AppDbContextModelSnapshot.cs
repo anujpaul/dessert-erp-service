@@ -378,12 +378,17 @@ namespace DessertERP.Infrastructure.Migrations
                     b.Property<Guid>("VendorId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("WarehouseId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("WorkflowInstanceId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
                     b.HasIndex("VendorId");
+
+                    b.HasIndex("WarehouseId");
 
                     b.HasIndex("OrganizationId", "PONumber")
                         .IsUnique();
@@ -481,12 +486,22 @@ namespace DessertERP.Infrastructure.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<Guid?>("WarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("WarehouseLocationId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("PurchaseOrderId");
 
                     b.HasIndex("ReceiptNumber")
                         .IsUnique();
+
+                    b.HasIndex("WarehouseId");
+
+                    b.HasIndex("WarehouseLocationId");
 
                     b.ToTable("purchase_order_receipts", (string)null);
                 });
@@ -5671,7 +5686,14 @@ namespace DessertERP.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("DessertERP.Domain.Modules.WarehouseManagement.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Vendor");
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("DessertERP.Domain.Modules.AccountsPayable.PurchaseOrderLine", b =>
@@ -5688,7 +5710,21 @@ namespace DessertERP.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("DessertERP.Domain.Modules.WarehouseManagement.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DessertERP.Domain.Modules.WarehouseManagement.WarehouseLocation", "WarehouseLocation")
+                        .WithMany()
+                        .HasForeignKey("WarehouseLocationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("PurchaseOrder");
+
+                    b.Navigation("Warehouse");
+
+                    b.Navigation("WarehouseLocation");
                 });
 
             modelBuilder.Entity("DessertERP.Domain.Modules.AccountsPayable.PurchaseOrderReceipt", b =>

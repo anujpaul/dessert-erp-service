@@ -49,6 +49,8 @@ public class PurchaseOrderConfiguration : IEntityTypeConfiguration<PurchaseOrder
         b.Property(e => e.InvoicedAmount).HasColumnType("numeric(18,4)");
         b.Ignore(e => e.CanReceive);
         b.HasOne(e => e.Vendor).WithMany().HasForeignKey(e => e.VendorId);
+        b.HasOne(e => e.Warehouse).WithMany().HasForeignKey(e => e.WarehouseId)
+            .OnDelete(DeleteBehavior.Restrict);
         b.HasMany(e => e.Lines).WithOne(l => l.PurchaseOrder)
             .HasForeignKey(l => l.PurchaseOrderId).OnDelete(DeleteBehavior.Cascade);
         b.HasMany(e => e.Receipts).WithOne(r => r.PurchaseOrder)
@@ -68,6 +70,10 @@ public class PurchaseOrderReceiptConfiguration : IEntityTypeConfiguration<Purcha
         b.Property(e => e.PurchaseOrderId).IsRequired();
         b.Property(e => e.ReceiptNumber).HasMaxLength(30).IsRequired();
         b.Property(e => e.Notes).HasMaxLength(500);
+        b.HasOne(e => e.Warehouse).WithMany().HasForeignKey(e => e.WarehouseId)
+            .OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(e => e.WarehouseLocation).WithMany().HasForeignKey(e => e.WarehouseLocationId)
+            .OnDelete(DeleteBehavior.Restrict);
         b.HasMany(e => e.Lines).WithOne(l => l.Receipt)
             .HasForeignKey(l => l.ReceiptId).OnDelete(DeleteBehavior.Cascade);
         b.HasIndex(e => e.ReceiptNumber).IsUnique();

@@ -23,6 +23,8 @@ public interface IPurchaseInventoryPostingService
         Guid purchaseOrderId,
         string purchaseOrderNumber,
         string receiptNumber,
+        Guid warehouseId,
+        Guid warehouseLocationId,
         IEnumerable<PurchaseInventoryLine> lines,
         string? notes = null,
         CancellationToken ct = default);
@@ -64,15 +66,40 @@ public class PurchaseInventoryPostingService : IPurchaseInventoryPostingService
         Guid purchaseOrderId,
         string purchaseOrderNumber,
         string receiptNumber,
+        Guid warehouseId,
+        Guid warehouseLocationId,
         IEnumerable<PurchaseInventoryLine> lines,
         string? notes = null,
         CancellationToken ct = default)
     {
+        var warehouse = await _db.Warehouses.FirstOrDefaultAsync(
+            item => item.Id == warehouseId && item.OrganizationId == organizationId, ct)
+            ?? throw new InvalidOperationException("Receiving warehouse not found.");
+        if (!warehouse.IsActive)
+            throw new InvalidOperationException("The receiving warehouse is inactive.");
+
+        var location = await _db.WarehouseLocations.FirstOrDefaultAsync(
+            item => item.Id == warehouseLocationId && item.WarehouseId == warehouseId, ct)
+            ?? throw new InvalidOperationException("The receiving location does not belong to the selected warehouse.");
+        if (!location.IsActive || !location.IsReceivable)
+            throw new InvalidOperationException("The selected location is not active and receivable.");
+
         foreach (var line in lines.Where(line => line.Quantity > 0))
         {
             var inventory = await LoadInventoryRecordAsync(line.ProductVariantId, ct);
             inventory.ReceiveStock(line.Quantity, line.UnitCost);
             inventory.AdjustOnOrder(-line.Quantity);
+            var balance = await _db.WarehouseInventoryBalances.FirstOrDefaultAsync(item =>
+                item.ProductVariantId == line.ProductVariantId
+                && item.WarehouseId == warehouseId
+                && item.WarehouseLocationId == warehouseLocationId, ct);
+            if (balance is null)
+            {
+                balance = new Domain.Modules.WarehouseManagement.WarehouseInventoryBalance(
+                    organizationId, line.ProductVariantId, warehouseId, warehouseLocationId);
+                _db.WarehouseInventoryBalances.Add(balance);
+            }
+            balance.Receive(line.Quantity);
             AddTransaction(
                 organizationId, purchaseOrderId, receiptNumber, inventory,
                 InventoryTransactionType.PurchaseReceipt, line.Quantity, line.UnitCost,

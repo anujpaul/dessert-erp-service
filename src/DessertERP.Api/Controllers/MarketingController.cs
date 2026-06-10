@@ -1,5 +1,6 @@
 using System.Xml.Linq;
 using DessertERP.Application.Common.Interfaces;
+using DessertERP.Application.Common.Security;
 using DessertERP.Application.Modules.Marketing.DTOs;
 using DessertERP.Application.Modules.Marketing.Services;
 using DessertERP.Domain.Modules.Retail;
@@ -12,6 +13,7 @@ namespace DessertERP.Api.Controllers;
 [ApiController]
 [Route("api/marketing")]
 [Authorize]
+[Authorize(Policy = PermissionKeys.MarketingAccess)]
 public class MarketingController : ControllerBase
 {
     private readonly IMarketingService _svc;

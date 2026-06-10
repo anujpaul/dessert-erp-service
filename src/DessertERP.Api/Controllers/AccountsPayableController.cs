@@ -1,11 +1,13 @@
 using DessertERP.Application.Modules.AccountsPayable.DTOs;
 using DessertERP.Application.Modules.AccountsPayable.Services;
+using DessertERP.Application.Common.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DessertERP.Api.Controllers;
 
 [Authorize]
+[Authorize(Policy = PermissionKeys.ApAccess)]
 [ApiController]
 [Route("api/ap")]
 [Produces("application/json")]
@@ -21,10 +23,12 @@ public class AccountsPayableController : ControllerBase
         => Ok(await _svc.GetVendorsAsync(ct));
 
     [HttpPost("vendors")]
+    [Authorize(Policy = PermissionKeys.ApVendorManage)]
     public async Task<IActionResult> CreateVendor([FromBody] CreateVendorRequest req, CancellationToken ct)
         => StatusCode(201, await _svc.CreateVendorAsync(req, ct));
 
     [HttpPut("vendors/{id:guid}")]
+    [Authorize(Policy = PermissionKeys.ApVendorManage)]
     public async Task<IActionResult> UpdateVendor(Guid id, [FromBody] UpdateVendorRequest req, CancellationToken ct)
     {
         try { return Ok(await _svc.UpdateVendorAsync(id, req, ct)); }
@@ -32,6 +36,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     [HttpDelete("vendors/{id:guid}")]
+    [Authorize(Policy = PermissionKeys.ApVendorManage)]
     public async Task<IActionResult> DeleteVendor(Guid id, CancellationToken ct)
     {
         try { await _svc.DeleteVendorAsync(id, ct); return NoContent(); }
@@ -57,6 +62,7 @@ public class AccountsPayableController : ControllerBase
         => Ok(await _svc.GetPurchaseOrderHistoryAsync(id, ct));
 
     [HttpPost("purchase-orders")]
+    [Authorize(Policy = PermissionKeys.ApPurchaseOrderManage)]
     public async Task<IActionResult> CreatePurchaseOrder([FromBody] CreatePurchaseOrderRequest req, CancellationToken ct)
     {
         try { return StatusCode(201, await _svc.CreatePurchaseOrderAsync(req, ct)); }
@@ -64,6 +70,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     [HttpPost("purchase-orders/{id:guid}/lines")]
+    [Authorize(Policy = PermissionKeys.ApPurchaseOrderManage)]
     public async Task<IActionResult> AddLine(Guid id, [FromBody] AddPOLineRequest req, CancellationToken ct)
     {
         try { return Ok(await _svc.AddPOLineAsync(id, req, ct)); }
@@ -71,6 +78,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     [HttpDelete("purchase-orders/{id:guid}/lines/{lineId:guid}")]
+    [Authorize(Policy = PermissionKeys.ApPurchaseOrderManage)]
     public async Task<IActionResult> RemoveLine(Guid id, Guid lineId, CancellationToken ct)
     {
         try { await _svc.RemovePOLineAsync(id, lineId, ct); return NoContent(); }
@@ -78,6 +86,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     [HttpPost("purchase-orders/{id:guid}/send")]
+    [Authorize(Policy = PermissionKeys.ApPurchaseOrderApprove)]
     public async Task<IActionResult> Send(Guid id, CancellationToken ct)
     {
         try { await _svc.SendPurchaseOrderAsync(id, ct); return NoContent(); }
@@ -86,6 +95,7 @@ public class AccountsPayableController : ControllerBase
 
     /// <summary>Record a goods receipt (partial or full). Can be called multiple times on the same PO.</summary>
     [HttpPost("purchase-orders/{id:guid}/receipts")]
+    [Authorize(Policy = PermissionKeys.ApPurchaseOrderReceive)]
     public async Task<IActionResult> RecordReceipt(Guid id, [FromBody] RecordReceiptRequest req, CancellationToken ct)
     {
         try { return StatusCode(201, await _svc.RecordReceiptAsync(id, req, ct)); }
@@ -98,6 +108,7 @@ public class AccountsPayableController : ControllerBase
         => Ok(await _svc.GetReceiptsAsync(id, ct));
 
     [HttpPost("purchase-orders/{id:guid}/close")]
+    [Authorize(Policy = PermissionKeys.ApPurchaseOrderApprove)]
     public async Task<IActionResult> Close(Guid id, CancellationToken ct)
     {
         try { await _svc.ClosePurchaseOrderAsync(id, ct); return NoContent(); }
@@ -105,6 +116,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     [HttpPost("purchase-orders/{id:guid}/cancel")]
+    [Authorize(Policy = PermissionKeys.ApPurchaseOrderApprove)]
     public async Task<IActionResult> Cancel(Guid id, CancellationToken ct)
     {
         try { await _svc.CancelPurchaseOrderAsync(id, ct); return NoContent(); }
@@ -125,6 +137,7 @@ public class AccountsPayableController : ControllerBase
         => Ok(await _svc.GetInvoicesAsync(vendorId, ct));
 
     [HttpPost("invoices")]
+    [Authorize(Policy = PermissionKeys.ApInvoiceManage)]
     public async Task<IActionResult> CreateInvoice([FromBody] CreateAPInvoiceRequest req, CancellationToken ct)
     {
         try { return StatusCode(201, await _svc.CreateInvoiceAsync(req, ct)); }
@@ -164,6 +177,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     [HttpPost("invoices/{id:guid}/approve")]
+    [Authorize(Policy = PermissionKeys.ApInvoiceApprove)]
     public async Task<IActionResult> ApproveInvoice(Guid id, CancellationToken ct)
     {
         try { await _svc.ApproveInvoiceAsync(id, ct); return NoContent(); }
@@ -171,6 +185,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     [HttpPost("invoices/{id:guid}/void")]
+    [Authorize(Policy = PermissionKeys.ApInvoiceApprove)]
     public async Task<IActionResult> VoidInvoice(Guid id, CancellationToken ct)
     {
         try { await _svc.VoidInvoiceAsync(id, ct); return NoContent(); }
@@ -184,6 +199,7 @@ public class AccountsPayableController : ControllerBase
         => Ok(await _svc.GetPaymentsAsync(vendorId, ct));
 
     [HttpPost("payments")]
+    [Authorize(Policy = PermissionKeys.ApInvoiceManage)]
     public async Task<IActionResult> CreatePayment([FromBody] CreateAPPaymentRequest req, CancellationToken ct)
     {
         try { return StatusCode(201, await _svc.CreatePaymentAsync(req, ct)); }

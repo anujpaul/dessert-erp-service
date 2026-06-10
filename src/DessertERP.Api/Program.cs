@@ -5,6 +5,7 @@ using Microsoft.OpenApi.Models;
 
 
 using DessertERP.Application.Common.Interfaces;
+using DessertERP.Application.Common.Security;
 using DessertERP.Application.Common.Services;
 using DessertERP.Application.Modules.AccountsPayable.Services;
 using DessertERP.Application.Modules.AccountsReceivable.Services;
@@ -139,7 +140,14 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    foreach (var permission in PermissionCatalog.PolicyKeys)
+    {
+        options.AddPolicy(permission, policy =>
+            policy.RequireClaim("permission", permission));
+    }
+});
 
 // ── API ───────────────────────────────────────────────────────────────────────
 builder.Services.AddControllers()

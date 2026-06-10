@@ -1,4 +1,5 @@
 using DessertERP.Application.Modules.WarehouseManagement;
+using DessertERP.Application.Common.Security;
 using DessertERP.Application.Modules.WarehouseManagement.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -6,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace DessertERP.Api.Controllers;
 
 [Authorize]
+[Authorize(Policy = PermissionKeys.InventoryAccess)]
 [ApiController]
 [Route("api/warehouse")]
 public class WarehouseManagementController : ControllerBase
@@ -27,6 +29,7 @@ public class WarehouseManagementController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = PermissionKeys.WarehouseManage)]
     public async Task<IActionResult> CreateWarehouse([FromBody] CreateWarehouseDto dto)
     {
         try { return StatusCode(201, await _svc.CreateWarehouseAsync(dto)); }
@@ -34,6 +37,7 @@ public class WarehouseManagementController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = PermissionKeys.WarehouseManage)]
     public async Task<IActionResult> UpdateWarehouse(Guid id, [FromBody] UpdateWarehouseDto dto)
     {
         var result = await _svc.UpdateWarehouseAsync(id, dto);
@@ -55,6 +59,7 @@ public class WarehouseManagementController : ControllerBase
         Ok(await _svc.GetLocationsAsync(warehouseId));
 
     [HttpPost("locations")]
+    [Authorize(Policy = PermissionKeys.WarehouseManage)]
     public async Task<IActionResult> CreateLocation([FromBody] CreateWarehouseLocationDto dto) =>
         Ok(await _svc.CreateLocationAsync(dto));
 
@@ -96,6 +101,7 @@ public class WarehouseManagementController : ControllerBase
         await _svc.StartReceivingInboundAsync(id) ? Ok() : NotFound();
 
     [HttpPost("inbound/{id:guid}/receive-lines")]
+    [Authorize(Policy = PermissionKeys.WarehouseOperate)]
     public async Task<IActionResult> ReceiveLines(Guid id, [FromBody] List<ReceiveInboundLineDto> lines)
     {
         try { return await _svc.ReceiveInboundLinesAsync(id, lines) ? Ok() : NotFound(); }
@@ -140,6 +146,7 @@ public class WarehouseManagementController : ControllerBase
         await _svc.PackOutboundOrderAsync(id) ? Ok() : NotFound();
 
     [HttpPost("outbound/{id:guid}/ship")]
+    [Authorize(Policy = PermissionKeys.WarehouseOperate)]
     public async Task<IActionResult> ShipOutbound(Guid id, [FromBody] ShipOutboundOrderDto dto)
     {
         try { return await _svc.ShipOutboundOrderAsync(id, dto) ? Ok() : NotFound(); }
@@ -176,6 +183,7 @@ public class WarehouseManagementController : ControllerBase
         await _svc.ConfirmTransferOrderAsync(id) ? Ok() : NotFound();
 
     [HttpPost("transfer/{id:guid}/ship")]
+    [Authorize(Policy = PermissionKeys.WarehouseOperate)]
     public async Task<IActionResult> ShipTransfer(Guid id, [FromBody] DateTime shippedDate)
     {
         try { return await _svc.ShipTransferOrderAsync(id, shippedDate) ? Ok() : NotFound(); }
@@ -187,6 +195,7 @@ public class WarehouseManagementController : ControllerBase
         await _svc.StartReceivingTransferAsync(id) ? Ok() : NotFound();
 
     [HttpPost("transfer/{id:guid}/complete")]
+    [Authorize(Policy = PermissionKeys.WarehouseOperate)]
     public async Task<IActionResult> CompleteTransfer(Guid id)
     {
         try { return await _svc.CompleteTransferOrderAsync(id) ? Ok() : NotFound(); }

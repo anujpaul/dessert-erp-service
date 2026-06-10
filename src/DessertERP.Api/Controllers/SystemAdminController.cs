@@ -1,5 +1,6 @@
 using DessertERP.Application.Modules.SystemAdmin.DTOs;
 using DessertERP.Application.Modules.SystemAdmin.Services;
+using DessertERP.Application.Common.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,6 +9,7 @@ namespace DessertERP.Api.Controllers;
 [ApiController]
 [Route("api/sysadmin")]
 [Authorize(Roles = "Admin")]
+[Authorize(Policy = PermissionKeys.SystemAccess)]
 public class SystemAdminController : ControllerBase
 {
     private readonly ISystemAdminService _svc;
@@ -16,12 +18,12 @@ public class SystemAdminController : ControllerBase
     // ── Users ────────────────────────────────────────────────────────────────
 
     [HttpGet("users")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = PermissionKeys.SystemUsersView)]
     public async Task<IActionResult> GetUsers(CancellationToken ct)
         => Ok(await _svc.GetUsersAsync(ct));
 
     [HttpGet("users/{id:guid}")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = PermissionKeys.SystemUsersView)]
     public async Task<IActionResult> GetUser(Guid id, CancellationToken ct)
     {
         var user = await _svc.GetUserAsync(id, ct);
@@ -29,6 +31,7 @@ public class SystemAdminController : ControllerBase
     }
 
     [HttpPost("users")]
+    [Authorize(Policy = PermissionKeys.SystemUsersManage)]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest req, CancellationToken ct)
     {
         try
@@ -40,6 +43,7 @@ public class SystemAdminController : ControllerBase
     }
 
     [HttpPut("users/{id:guid}")]
+    [Authorize(Policy = PermissionKeys.SystemUsersManage)]
     public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserRequest req, CancellationToken ct)
     {
         try   { return Ok(await _svc.UpdateUserAsync(id, req, ct)); }
@@ -47,6 +51,7 @@ public class SystemAdminController : ControllerBase
     }
 
     [HttpPost("users/{id:guid}/activate")]
+    [Authorize(Policy = PermissionKeys.SystemUsersManage)]
     public async Task<IActionResult> ActivateUser(Guid id, CancellationToken ct)
     {
         await _svc.ActivateUserAsync(id, ct);
@@ -54,6 +59,7 @@ public class SystemAdminController : ControllerBase
     }
 
     [HttpPost("users/{id:guid}/deactivate")]
+    [Authorize(Policy = PermissionKeys.SystemUsersManage)]
     public async Task<IActionResult> DeactivateUser(Guid id, CancellationToken ct)
     {
         await _svc.DeactivateUserAsync(id, ct);
@@ -61,6 +67,7 @@ public class SystemAdminController : ControllerBase
     }
 
     [HttpPost("users/reset-password")]
+    [Authorize(Policy = PermissionKeys.SystemUsersManage)]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest req, CancellationToken ct)
     {
         try   { await _svc.ResetPasswordAsync(req, ct); return NoContent(); }
@@ -70,12 +77,12 @@ public class SystemAdminController : ControllerBase
     // ── Roles ─────────────────────────────────────────────────────────────────
 
     [HttpGet("roles")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = PermissionKeys.SystemRolesView)]
     public async Task<IActionResult> GetRoles(CancellationToken ct)
         => Ok(await _svc.GetRolesAsync(ct));
 
     [HttpGet("roles/{id:guid}")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = PermissionKeys.SystemRolesView)]
     public async Task<IActionResult> GetRole(Guid id, CancellationToken ct)
     {
         var role = await _svc.GetRoleAsync(id, ct);
@@ -83,6 +90,7 @@ public class SystemAdminController : ControllerBase
     }
 
     [HttpPost("roles")]
+    [Authorize(Policy = PermissionKeys.SystemRolesManage)]
     public async Task<IActionResult> CreateRole([FromBody] CreateRoleRequest req, CancellationToken ct)
     {
         try
@@ -94,6 +102,7 @@ public class SystemAdminController : ControllerBase
     }
 
     [HttpPut("roles/{id:guid}")]
+    [Authorize(Policy = PermissionKeys.SystemRolesManage)]
     public async Task<IActionResult> UpdateRole(Guid id, [FromBody] UpdateRoleRequest req, CancellationToken ct)
     {
         try   { return Ok(await _svc.UpdateRoleAsync(id, req, ct)); }
@@ -101,6 +110,7 @@ public class SystemAdminController : ControllerBase
     }
 
     [HttpDelete("roles/{id:guid}")]
+    [Authorize(Policy = PermissionKeys.SystemRolesManage)]
     public async Task<IActionResult> DeleteRole(Guid id, CancellationToken ct)
     {
         try   { await _svc.DeleteRoleAsync(id, ct); return NoContent(); }
@@ -110,7 +120,7 @@ public class SystemAdminController : ControllerBase
     // ── Audit Log ─────────────────────────────────────────────────────────────
 
     [HttpGet("audit-log")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = PermissionKeys.SystemAuditView)]
     public async Task<IActionResult> GetAuditLog(
         [FromQuery] string? module,
         [FromQuery] Guid?   userId,
@@ -122,11 +132,12 @@ public class SystemAdminController : ControllerBase
     // ── Org Settings ──────────────────────────────────────────────────────────
 
     [HttpGet("org-settings")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = PermissionKeys.SystemSettingsManage)]
     public async Task<IActionResult> GetOrgSettings(CancellationToken ct)
         => Ok(await _svc.GetOrgSettingsAsync(ct));
 
     [HttpPut("org-settings")]
+    [Authorize(Policy = PermissionKeys.SystemSettingsManage)]
     public async Task<IActionResult> UpdateOrgSettings([FromBody] UpdateOrgSettingsRequest req, CancellationToken ct)
     {
         try   { return Ok(await _svc.UpdateOrgSettingsAsync(req, ct)); }

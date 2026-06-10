@@ -1,4 +1,5 @@
 using DessertERP.Application.Common.Interfaces;
+using DessertERP.Application.Common.Security;
 using DessertERP.Application.Modules.DataManagement.Services;
 using Hangfire;
 using Microsoft.AspNetCore.Authorization;
@@ -8,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace DessertERP.Api.Controllers;
 
 [Authorize]
+[Authorize(Policy = PermissionKeys.DataAccess)]
 [ApiController]
 [Route("api/batch-jobs")]
 [Produces("application/json")]

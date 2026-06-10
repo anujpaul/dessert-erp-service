@@ -1,11 +1,13 @@
 using DessertERP.Application.Modules.ProductManagement.DTOs;
 using DessertERP.Application.Modules.ProductManagement.Services;
+using DessertERP.Application.Common.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DessertERP.Api.Controllers;
 
 [Authorize]
+[Authorize(Policy = PermissionKeys.ProductAccess)]
 [ApiController]
 [Route("api/pm")]
 public class ProductManagementController : ControllerBase
@@ -21,10 +23,12 @@ public class ProductManagementController : ControllerBase
         => Ok(await _pm.GetCategoriesAsync(ct));
 
     [HttpPost("categories")]
+    [Authorize(Policy = PermissionKeys.ProductCatalogManage)]
     public async Task<IActionResult> CreateCategory([FromBody] CreateCategoryRequest req, CancellationToken ct)
         => Ok(await _pm.CreateCategoryAsync(req, ct));
 
     [HttpDelete("categories/{id:guid}")]
+    [Authorize(Policy = PermissionKeys.ProductCatalogManage)]
     public async Task<IActionResult> DeleteCategory(Guid id, CancellationToken ct)
     {
         await _pm.DeleteCategoryAsync(id, ct);
@@ -38,11 +42,12 @@ public class ProductManagementController : ControllerBase
         => Ok(await _pm.GetBrandsAsync(ct));
 
     [HttpPost("brands")]
+    [Authorize(Policy = PermissionKeys.ProductCatalogManage)]
     public async Task<IActionResult> CreateBrand([FromBody] CreateBrandRequest req, CancellationToken ct)
         => Ok(await _pm.CreateBrandAsync(req, ct));
 
     [HttpDelete("brands/{id:guid}")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = PermissionKeys.ProductCatalogManage)]
     public async Task<IActionResult> DeleteBrand(Guid id, CancellationToken ct)
     {
         try { await _pm.DeleteBrandAsync(id, ct); return NoContent(); }
@@ -50,7 +55,7 @@ public class ProductManagementController : ControllerBase
     }
 
     [HttpDelete("categories/{id:guid}/force")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = PermissionKeys.ProductCatalogManage)]
     public async Task<IActionResult> DeleteCategoryGuarded(Guid id, CancellationToken ct)
     {
         try { await _pm.DeleteCategoryAsync(id, ct); return NoContent(); }
@@ -77,10 +82,12 @@ public class ProductManagementController : ControllerBase
     }
 
     [HttpPost("products")]
+    [Authorize(Policy = PermissionKeys.ProductCatalogManage)]
     public async Task<IActionResult> CreateProduct([FromBody] CreateProductRequest req, CancellationToken ct)
         => Ok(await _pm.CreateProductAsync(req, ct));
 
     [HttpPut("products/{id:guid}")]
+    [Authorize(Policy = PermissionKeys.ProductCatalogManage)]
     public async Task<IActionResult> UpdateProduct(Guid id, [FromBody] UpdateProductRequest req, CancellationToken ct)
     {
         await _pm.UpdateProductAsync(id, req, ct);
@@ -121,6 +128,7 @@ public class ProductManagementController : ControllerBase
         => Ok(await _pm.GetInventoryAsync(needsReorder, ct));
 
     [HttpPost("inventory/{variantId:guid}/adjust")]
+    [Authorize(Policy = PermissionKeys.InventoryStockAdjust)]
     public async Task<IActionResult> AdjustInventory(Guid variantId, [FromBody] AdjustInventoryRequest req, CancellationToken ct)
     {
         await _pm.AdjustInventoryAsync(variantId, req, ct);
@@ -128,6 +136,7 @@ public class ProductManagementController : ControllerBase
     }
 
     [HttpPost("inventory/{variantId:guid}/set")]
+    [Authorize(Policy = PermissionKeys.InventoryStockAdjust)]
     public async Task<IActionResult> SetInventory(Guid variantId, [FromBody] SetInventoryRequest req, CancellationToken ct)
     {
         await _pm.SetInventoryAsync(variantId, req, ct);
@@ -135,6 +144,7 @@ public class ProductManagementController : ControllerBase
     }
 
     [HttpPut("inventory/{variantId:guid}/thresholds")]
+    [Authorize(Policy = PermissionKeys.InventoryStockAdjust)]
     public async Task<IActionResult> UpdateThresholds(Guid variantId, [FromBody] UpdateThresholdsRequest req, CancellationToken ct)
     {
         await _pm.UpdateThresholdsAsync(variantId, req, ct);

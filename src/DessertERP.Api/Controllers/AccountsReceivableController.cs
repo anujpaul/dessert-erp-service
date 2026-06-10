@@ -1,11 +1,13 @@
 using DessertERP.Application.Modules.AccountsReceivable.DTOs;
 using DessertERP.Application.Modules.AccountsReceivable.Services;
+using DessertERP.Application.Common.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DessertERP.Api.Controllers;
 
 [Authorize]
+[Authorize(Policy = PermissionKeys.ArAccess)]
 [ApiController]
 [Route("api/ar")]
 [Produces("application/json")]
@@ -21,10 +23,12 @@ public class AccountsReceivableController : ControllerBase
         => Ok(await _svc.GetCustomersAsync(ct));
 
     [HttpPost("customers")]
+    [Authorize(Policy = PermissionKeys.ArCustomerManage)]
     public async Task<IActionResult> CreateCustomer([FromBody] CreateCustomerRequest req, CancellationToken ct)
         => StatusCode(201, await _svc.CreateCustomerAsync(req, ct));
 
     [HttpPut("customers/{id:guid}")]
+    [Authorize(Policy = PermissionKeys.ArCustomerManage)]
     public async Task<IActionResult> UpdateCustomer(Guid id, [FromBody] UpdateCustomerRequest req, CancellationToken ct)
     {
         try { return Ok(await _svc.UpdateCustomerAsync(id, req, ct)); }
@@ -57,6 +61,7 @@ public class AccountsReceivableController : ControllerBase
         => Ok(await _svc.GetSalesOrderHistoryAsync(id, ct));
 
     [HttpPost("sales-orders")]
+    [Authorize(Policy = PermissionKeys.ArSalesOrderManage)]
     public async Task<IActionResult> CreateSalesOrder([FromBody] CreateSalesOrderRequest req, CancellationToken ct)
     {
         try { return StatusCode(201, await _svc.CreateSalesOrderAsync(req, ct)); }
@@ -64,6 +69,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     [HttpPost("sales-orders/{id:guid}/lines")]
+    [Authorize(Policy = PermissionKeys.ArSalesOrderManage)]
     public async Task<IActionResult> AddLine(Guid id, [FromBody] AddSalesOrderLineRequest req, CancellationToken ct)
     {
         Console.WriteLine($"Adding line to order {id}: ProductVariantId={req.ProductVariantId}, Quantity={req.Quantity}, OverrideUnitPrice={req.OverrideUnitPrice}, DiscountPct={req.DiscountPct}");
@@ -73,6 +79,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     [HttpDelete("sales-orders/{id:guid}/lines/{lineId:guid}")]
+    [Authorize(Policy = PermissionKeys.ArSalesOrderManage)]
     public async Task<IActionResult> RemoveLine(Guid id, Guid lineId, CancellationToken ct)
     {
         try { await _svc.RemoveSalesOrderLineAsync(id, lineId, ct); return NoContent(); }
@@ -80,6 +87,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     [HttpPut("sales-orders/{id:guid}/lines/{lineId:guid}")]
+    [Authorize(Policy = PermissionKeys.ArSalesOrderManage)]
     public async Task<IActionResult> UpdateLine(
         Guid id, Guid lineId, [FromBody] UpdateSalesOrderLineRequest req, CancellationToken ct)
     {
@@ -89,6 +97,7 @@ public class AccountsReceivableController : ControllerBase
 
     /// <summary>Apply a flat discount % to every line on a Draft order (used by coupon application).</summary>
     [HttpPost("sales-orders/{id:guid}/apply-discount")]
+    [Authorize(Policy = PermissionKeys.ArSalesOrderManage)]
     public async Task<IActionResult> ApplyDiscount(Guid id, [FromBody] ApplyDiscountRequest req, CancellationToken ct)
     {
         try { return Ok(await _svc.ApplyDiscountToOrderAsync(id, req.DiscountPct, ct)); }
@@ -96,6 +105,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     [HttpPost("sales-orders/{id:guid}/confirm")]
+    [Authorize(Policy = PermissionKeys.ArSalesOrderConfirm)]
     public async Task<IActionResult> Confirm(
         Guid id, [FromBody] ConfirmSalesOrderRequest req, CancellationToken ct)
     {
@@ -104,6 +114,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     [HttpPost("sales-orders/{id:guid}/picking")]
+    [Authorize(Policy = PermissionKeys.ArSalesOrderShip)]
     public async Task<IActionResult> StartPicking(Guid id, CancellationToken ct)
     {
         try { await _svc.StartPickingAsync(id, ct); return NoContent(); }
@@ -111,6 +122,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     [HttpPost("sales-orders/{id:guid}/ship")]
+    [Authorize(Policy = PermissionKeys.ArSalesOrderShip)]
     public async Task<IActionResult> Ship(Guid id, [FromBody] ShipOrderRequest req, CancellationToken ct)
     {
         try { await _svc.ShipSalesOrderAsync(id, req, ct); return NoContent(); }
@@ -118,6 +130,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     [HttpPost("sales-orders/{id:guid}/cancel")]
+    [Authorize(Policy = PermissionKeys.ArSalesOrderConfirm)]
     public async Task<IActionResult> Cancel(Guid id, CancellationToken ct)
     {
         try { await _svc.CancelSalesOrderAsync(id, ct); return NoContent(); }
@@ -131,6 +144,7 @@ public class AccountsReceivableController : ControllerBase
         => Ok(await _svc.GetInvoicesAsync(customerId, ct));
 
     [HttpPost("invoices")]
+    [Authorize(Policy = PermissionKeys.ArInvoiceManage)]
     public async Task<IActionResult> CreateInvoice([FromBody] CreateARInvoiceRequest req, CancellationToken ct)
     {
         try { return StatusCode(201, await _svc.CreateInvoiceAsync(req, ct)); }
@@ -138,6 +152,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     [HttpPost("sales-orders/{id:guid}/generate-invoice")]
+    [Authorize(Policy = PermissionKeys.ArInvoiceManage)]
     public async Task<IActionResult> GenerateInvoice(Guid id, CancellationToken ct)
     {
         try { return Ok(await _svc.GenerateInvoiceFromOrderAsync(id, ct)); }
@@ -145,6 +160,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     [HttpPost("invoices/{id:guid}/issue")]
+    [Authorize(Policy = PermissionKeys.ArInvoicePost)]
     public async Task<IActionResult> IssueInvoice(Guid id, CancellationToken ct)
     {
         try { await _svc.IssueInvoiceAsync(id, ct); return NoContent(); }
@@ -152,6 +168,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     [HttpPost("invoices/{id:guid}/void")]
+    [Authorize(Policy = PermissionKeys.ArInvoicePost)]
     public async Task<IActionResult> VoidInvoice(Guid id, CancellationToken ct)
     {
         try { await _svc.VoidInvoiceAsync(id, ct); return NoContent(); }
@@ -165,6 +182,7 @@ public class AccountsReceivableController : ControllerBase
         => Ok(await _svc.GetPaymentsAsync(customerId, ct));
 
     [HttpPost("payments")]
+    [Authorize(Policy = PermissionKeys.ArInvoiceManage)]
     public async Task<IActionResult> CreatePayment([FromBody] CreateARPaymentRequest req, CancellationToken ct)
     {
         try { return StatusCode(201, await _svc.CreatePaymentAsync(req, ct)); }

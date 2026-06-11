@@ -115,5 +115,6 @@ public class BatchJobSchedulerWorker : BackgroundService
         BatchJobType.ImportSalesOrder or
         BatchJobType.ImportPurchaseOrder or
         BatchJobType.ImportVendor or
-        BatchJobType.ImportProduct;
+        BatchJobType.ImportProduct or
+        BatchJobType.ImportRetailTransaction;
 }

@@ -1,5 +1,6 @@
 using DessertERP.Application.Common.Interfaces;
 using DessertERP.Application.Modules.DataManagement.Services;
+using DessertERP.Application.Modules.Retail.Services;
 using DessertERP.Infrastructure.Persistence;
 using DessertERP.Infrastructure.Services;
 using DessertERP.Infrastructure.Storage;
@@ -31,6 +32,7 @@ builder.Services.AddScoped<ICurrentOrganizationService, NoScopeOrganizationServi
 // ── Application Services ──────────────────────────────────────────────────────
 builder.Services.AddScoped<IDataManagementService, DataManagementService>();
 builder.Services.AddScoped<IBatchJobService, BatchJobService>();
+builder.Services.AddScoped<IRetailStatementService, RetailStatementService>();
 
 // ── Azure Blob Storage ────────────────────────────────────────────────────────
 // Reads "AzureStorage:ConnectionString" from appsettings.json / environment variables.

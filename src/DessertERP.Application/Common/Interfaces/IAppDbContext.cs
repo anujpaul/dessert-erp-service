@@ -103,6 +103,8 @@ public interface IAppDbContext
     DbSet<POSTransaction>     POSTransactions     { get; }
     DbSet<POSTransactionLine> POSTransactionLines { get; }
     DbSet<POSPayment>         POSPayments         { get; }
+    DbSet<RetailStatement>    RetailStatements    { get; }
+    DbSet<RetailTenderSettlement> RetailTenderSettlements { get; }
     DbSet<Promotion>          Promotions          { get; }
     DbSet<Coupon>             Coupons             { get; }
     DbSet<CouponRedemption>   CouponRedemptions   { get; }

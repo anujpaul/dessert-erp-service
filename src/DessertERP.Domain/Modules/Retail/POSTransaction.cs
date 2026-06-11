@@ -46,6 +46,7 @@ public class POSTransaction : BaseEntity
     // Processing results
     public Guid?   ARInvoiceId   { get; private set; }
     public Guid?   JournalEntryId { get; private set; }
+    public Guid?   RetailStatementId { get; private set; }
     public string? ProcessingError { get; private set; }
     public string? SourceFile    { get; private set; }   // if imported via batch
 
@@ -114,7 +115,25 @@ public class POSTransaction : BaseEntity
         RecalculateTotals();
     }
 
-    public void MarkProcessed(Guid arInvoiceId, Guid? journalEntryId = null)
+    public void SetImportedTotals(decimal subTotal, decimal discountTotal, decimal taxTotal,
+        decimal grandTotal, decimal tenderedAmount)
+    {
+        SubTotal = subTotal;
+        DiscountTotal = discountTotal;
+        TaxTotal = taxTotal;
+        GrandTotal = grandTotal;
+        TenderedAmount = tenderedAmount;
+        ChangeAmount = 0m;
+        SetUpdated();
+    }
+
+    public void AssignToStatement(Guid statementId)
+    {
+        RetailStatementId = statementId;
+        SetUpdated();
+    }
+
+    public void MarkProcessed(Guid? arInvoiceId, Guid? journalEntryId = null)
     {
         Status         = POSTransactionStatus.Processed;
         ARInvoiceId    = arInvoiceId;
@@ -171,6 +190,29 @@ public class POSTransactionLine : BaseEntity
         TaxRate          = taxRate;
         IsReturn         = isReturn;
         Calculate();
+    }
+
+    public POSTransactionLine(Guid posTransactionId, string sku, string productName,
+        decimal quantity, decimal unitPrice, decimal discountAmount, decimal taxAmount,
+        decimal lineSubTotal, decimal lineTotal, Guid? productVariantId,
+        string unitOfMeasure, bool isReturn)
+    {
+        POSTransactionId = posTransactionId;
+        ProductVariantId = productVariantId;
+        Sku = sku.Trim();
+        ProductName = productName.Trim();
+        UnitOfMeasure = unitOfMeasure;
+        Quantity = quantity;
+        UnitPrice = unitPrice;
+        LineSubTotal = lineSubTotal;
+        DiscountAmount = discountAmount;
+        TaxAmount = taxAmount;
+        LineTotal = lineTotal;
+        DiscountPct = lineSubTotal == 0 ? 0 : Math.Abs(discountAmount / lineSubTotal * 100m);
+        TaxRate = lineSubTotal - discountAmount == 0
+            ? 0
+            : Math.Abs(taxAmount / (lineSubTotal - discountAmount) * 100m);
+        IsReturn = isReturn;
     }
 
     private void Calculate()

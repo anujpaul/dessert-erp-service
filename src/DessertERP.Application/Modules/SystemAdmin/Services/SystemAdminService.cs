@@ -1,4 +1,5 @@
 using DessertERP.Application.Common.Interfaces;
+using DessertERP.Application.Common.Security;
 using DessertERP.Application.Modules.SystemAdmin.DTOs;
 using DessertERP.Domain.Common;
 using DessertERP.Domain.Modules.SystemAdmin;
@@ -224,6 +225,13 @@ public class SystemAdminService : ISystemAdminService
         u.Id, u.OrganizationId, u.Username, u.Email, u.FullName,
         u.Status.ToString(), u.LastLoginAt,
         u.UserRoles.Where(r => r.Role != null).Select(r => r.Role!.Name).ToList(),
+        PermissionCatalog.ExpandForRoles(u.UserRoles
+            .Where(r => r.Role != null)
+            .SelectMany(r => r.Role!.Permissions)
+            .Select(p => $"{p.Module}:{p.Action}"),
+            u.UserRoles.Where(r => r.Role != null).Select(r => r.Role!.Name))
+            .Order()
+            .ToList(),
         u.CreatedAt);
 
     private static RoleDto ToRoleDto(Role r) => new(

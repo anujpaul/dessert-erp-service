@@ -1,4 +1,5 @@
 using DessertERP.Application.Common.Interfaces;
+using DessertERP.Application.Common.Security;
 using DessertERP.Application.Modules.SystemAdmin.DTOs;
 using DessertERP.Domain.Modules.SystemAdmin;
 using Microsoft.EntityFrameworkCore;
@@ -21,7 +22,6 @@ public class AuthService : IAuthService
     public async Task<LoginResponse> LoginAsync(LoginRequest req, string? ipAddress, CancellationToken ct = default)
     {
         var user = await _db.AppUsers
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role).ThenInclude(r => r!.Permissions)
             .FirstOrDefaultAsync(u => u.Username == req.Username.ToLowerInvariant() && !u.IsDeleted, ct)
             ?? throw new InvalidOperationException("Invalid username or password.");
 
@@ -35,13 +35,8 @@ public class AuthService : IAuthService
             throw new InvalidOperationException("Invalid username or password.");
         }
 
-        var roles       = user.UserRoles.Where(ur => ur.Role != null).Select(ur => ur.Role!.Name).ToList();
-        var permissions = user.UserRoles
-            .Where(ur => ur.Role != null)
-            .SelectMany(ur => ur.Role!.Permissions)
-            .Select(p => $"{p.Module}:{p.Action}")
-            .Distinct()
-            .ToList();
+        var (roles, storedPermissions) = await LoadAuthorizationAsync(user.Id, ct);
+        var permissions = PermissionCatalog.ExpandForRoles(storedPermissions, roles).Order().ToList();
 
         var accessToken  = _jwt.GenerateAccessToken(user, roles, permissions);
         var refreshToken = _jwt.GenerateRefreshToken();
@@ -57,26 +52,20 @@ public class AuthService : IAuthService
 
         return new LoginResponse(accessToken, refreshToken, _jwt.AccessTokenExpiry,
             new UserDto(user.Id, user.OrganizationId, user.Username, user.Email, user.FullName,
-                user.Status.ToString(), user.LastLoginAt, roles, user.CreatedAt));
+                user.Status.ToString(), user.LastLoginAt, roles, permissions, user.CreatedAt));
     }
 
     public async Task<LoginResponse> RefreshAsync(RefreshTokenRequest req, string? ipAddress, CancellationToken ct = default)
     {
         var user = await _db.AppUsers
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role).ThenInclude(r => r!.Permissions)
             .FirstOrDefaultAsync(u => u.RefreshToken == req.RefreshToken && !u.IsDeleted, ct)
             ?? throw new InvalidOperationException("Invalid refresh token.");
 
         if (user.RefreshTokenExpiry < DateTime.UtcNow)
             throw new InvalidOperationException("Refresh token has expired. Please log in again.");
 
-        var roles       = user.UserRoles.Where(ur => ur.Role != null).Select(ur => ur.Role!.Name).ToList();
-        var permissions = user.UserRoles
-            .Where(ur => ur.Role != null)
-            .SelectMany(ur => ur.Role!.Permissions)
-            .Select(p => $"{p.Module}:{p.Action}")
-            .Distinct()
-            .ToList();
+        var (roles, storedPermissions) = await LoadAuthorizationAsync(user.Id, ct);
+        var permissions = PermissionCatalog.ExpandForRoles(storedPermissions, roles).Order().ToList();
 
         var accessToken  = _jwt.GenerateAccessToken(user, roles, permissions);
         var refreshToken = _jwt.GenerateRefreshToken();
@@ -86,7 +75,7 @@ public class AuthService : IAuthService
 
         return new LoginResponse(accessToken, refreshToken, _jwt.AccessTokenExpiry,
             new UserDto(user.Id, user.OrganizationId, user.Username, user.Email, user.FullName,
-                user.Status.ToString(), user.LastLoginAt, roles, user.CreatedAt));
+                user.Status.ToString(), user.LastLoginAt, roles, permissions, user.CreatedAt));
     }
 
     public async Task LogoutAsync(Guid userId, CancellationToken ct = default)
@@ -108,5 +97,32 @@ public class AuthService : IAuthService
 
         user.SetPasswordHash(_hasher.Hash(req.NewPassword));
         await _db.SaveChangesAsync(ct);
+    }
+
+    private async Task<(List<string> Roles, List<string> Permissions)> LoadAuthorizationAsync(
+        Guid userId,
+        CancellationToken ct)
+    {
+        var assignedRoles = await _db.UserRoles
+            .AsNoTracking()
+            .Where(userRole => userRole.UserId == userId && userRole.Role != null)
+            .Select(userRole => new
+            {
+                userRole.RoleId,
+                Name = userRole.Role!.Name
+            })
+            .ToListAsync(ct);
+
+        var roleIds = assignedRoles.Select(role => role.RoleId).ToList();
+        var permissions = roleIds.Count == 0
+            ? []
+            : await _db.RolePermissions
+                .AsNoTracking()
+                .Where(permission => roleIds.Contains(permission.RoleId))
+                .Select(permission => permission.Module + ":" + permission.Action)
+                .Distinct()
+                .ToListAsync(ct);
+
+        return (assignedRoles.Select(role => role.Name).Distinct().ToList(), permissions);
     }
 }

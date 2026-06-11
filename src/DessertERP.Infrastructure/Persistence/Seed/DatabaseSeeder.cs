@@ -24,6 +24,7 @@ public static class DatabaseSeeder
         await SeedCustomersAsync(db, logger, orgId);
         await SeedVendorsAsync(db, logger, orgId);
         await SeedSystemAdminAsync(db, logger, orgId);
+        await RemoveLegacySystemAdminRoleAsync(db, logger);
     }
 
     // ── Default Organization ───────────────────────────────────────────────────
@@ -767,4 +768,19 @@ public static class DatabaseSeeder
             logger.LogInformation("Default admin user created — username: admin, password: Admin@123!");
         }
     }
+
+    private static async Task RemoveLegacySystemAdminRoleAsync(AppDbContext db, ILogger logger)
+    {
+        var legacyRoles = await db.Roles.IgnoreQueryFilters()
+            .Where(role => role.Name == "SystemAdmin")
+            .ToListAsync();
+
+        if (legacyRoles.Count == 0)
+            return;
+
+        db.Roles.RemoveRange(legacyRoles);
+        await db.SaveChangesAsync();
+        logger.LogInformation("Removed the obsolete SystemAdmin role; Admin is the full-access role.");
+    }
+
 }

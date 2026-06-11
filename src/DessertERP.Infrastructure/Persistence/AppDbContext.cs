@@ -96,6 +96,8 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<POSTransaction>     POSTransactions     => Set<POSTransaction>();
     public DbSet<POSTransactionLine> POSTransactionLines => Set<POSTransactionLine>();
     public DbSet<POSPayment>         POSPayments         => Set<POSPayment>();
+    public DbSet<RetailStatement>    RetailStatements    => Set<RetailStatement>();
+    public DbSet<RetailTenderSettlement> RetailTenderSettlements => Set<RetailTenderSettlement>();
     public DbSet<Promotion>          Promotions          => Set<Promotion>();
     public DbSet<Coupon>             Coupons             => Set<Coupon>();
     public DbSet<CouponRedemption>   CouponRedemptions   => Set<CouponRedemption>();
@@ -249,6 +251,10 @@ public class AppDbContext : DbContext, IAppDbContext
             .HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<POSPayment>()
             .HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<RetailStatement>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<RetailTenderSettlement>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<Promotion>()
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<Coupon>()

@@ -1,6 +1,7 @@
 using DessertERP.Application.Common.Interfaces;
 using DessertERP.Application.Modules.DataManagement.DTOs;
 using DessertERP.Domain.Modules.DataManagement;
+using DessertERP.Application.Modules.Retail.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -87,14 +88,17 @@ public class BatchJobService : IBatchJobService
     private readonly IDataManagementService _dm;
     private readonly IFileShareService _fs;
     private readonly ILogger<BatchJobService> _logger;
+    private readonly IRetailStatementService _retailStatements;
 
     public BatchJobService(IAppDbContext db, IDataManagementService dm,
-        IFileShareService fs, ILogger<BatchJobService> logger)
+        IFileShareService fs, ILogger<BatchJobService> logger,
+        IRetailStatementService retailStatements)
     {
         _db     = db;
         _dm     = dm;
         _fs     = fs;
         _logger = logger;
+        _retailStatements = retailStatements;
     }
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
@@ -209,11 +213,9 @@ public class BatchJobService : IBatchJobService
             BatchJobType.ImportPurchaseOrder => "PurchaseOrder",
             BatchJobType.ImportVendor        => "Vendor",
             BatchJobType.ImportProduct       => "Product",
+            BatchJobType.ImportRetailTransaction => "RetailTransaction",
             _ => throw new InvalidOperationException($"Job type {config.JobType} is not an import job.")
         };
-
-        var org = await _db.Organizations.FirstOrDefaultAsync(ct)
-            ?? throw new InvalidOperationException("No organization found.");
 
         int totalFiles = 0, totalPromoted = 0, totalFailed = 0;
         var errors = new List<string>();
@@ -231,21 +233,32 @@ public class BatchJobService : IBatchJobService
                 tempPath = Path.Combine(Path.GetTempPath(), $"dessert_erp_{Guid.NewGuid()}{ext}");
                 await File.WriteAllBytesAsync(tempPath, data, ct);
 
-                var importJobDto = await _dm.CreateImportJobAsync(
-                    org.Id, entityType, config.FileFormat, fileName, tempPath, "batch-job", ct);
+                if (config.JobType == BatchJobType.ImportRetailTransaction)
+                {
+                    await using var retailXml = File.OpenRead(tempPath);
+                    var result = await _retailStatements.ImportPosLogAsync(
+                        config.OrganizationId, retailXml, fileName, ct);
+                    totalFiles++;
+                    if (!result.Duplicate) totalPromoted++;
+                }
+                else
+                {
+                    var importJobDto = await _dm.CreateImportJobAsync(
+                        config.OrganizationId, entityType, config.FileFormat, fileName, tempPath, "batch-job", ct);
 
-                await _dm.StageAsync(importJobDto.Id, ct);
-                await _dm.ValidateAsync(importJobDto.Id, ct);
-                await _dm.PromoteAsync(importJobDto.Id, ct);
+                    await _dm.StageAsync(importJobDto.Id, ct);
+                    await _dm.ValidateAsync(importJobDto.Id, ct);
+                    await _dm.PromoteAsync(importJobDto.Id, ct);
 
-                var importJob = await _dm.GetImportJobAsync(importJobDto.Id, ct);
+                    var importJob = await _dm.GetImportJobAsync(importJobDto.Id, ct);
 
-                if (config.AutoConfirmSalesOrders && config.JobType == BatchJobType.ImportSalesOrder)
-                    await _dm.AutoConfirmSalesOrdersAsync(importJobDto.Id, ct);
+                    if (config.AutoConfirmSalesOrders && config.JobType == BatchJobType.ImportSalesOrder)
+                        await _dm.AutoConfirmSalesOrdersAsync(importJobDto.Id, ct);
 
-                totalFiles++;
-                totalPromoted += importJob?.PromotedRows ?? 0;
-                totalFailed   += importJob?.InvalidRows  ?? 0;
+                    totalFiles++;
+                    totalPromoted += importJob?.PromotedRows ?? 0;
+                    totalFailed   += importJob?.InvalidRows  ?? 0;
+                }
 
                 // Move to processed folder in Azure Files
                 await _fs.MoveAsync(inbox, fileName, processed, $"{stamp}_{fileName}", ct);
@@ -261,6 +274,19 @@ public class BatchJobService : IBatchJobService
             {
                 if (tempPath != null && File.Exists(tempPath))
                     try { File.Delete(tempPath); } catch { }
+            }
+        }
+
+        if (config.JobType == BatchJobType.ImportRetailTransaction && totalPromoted > 0)
+        {
+            try
+            {
+                await _retailStatements.PostOpenStatementsAsync(config.OrganizationId, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Retail statement posting failed after import job {JobId}", config.Id);
+                errors.Add($"Statement posting: {ex.Message}");
             }
         }
 

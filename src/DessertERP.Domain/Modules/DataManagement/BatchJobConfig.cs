@@ -8,6 +8,7 @@ public enum BatchJobType
     ImportPurchaseOrder,
     ImportVendor,
     ImportProduct,
+    ImportRetailTransaction,
     ExportSalesOrder,
     ExportPurchaseOrder,
     ExportVendor,

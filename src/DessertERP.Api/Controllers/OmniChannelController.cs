@@ -1,4 +1,5 @@
 using DessertERP.Application.Common.Interfaces;
+using DessertERP.Application.Common.Security;
 using DessertERP.Application.Modules.Retail.DTOs;
 using DessertERP.Application.Modules.Retail.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -7,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace DessertERP.Api.Controllers;
 
 [Authorize]
+[Authorize(Policy = PermissionKeys.OmniChannelAccess)]
 [ApiController]
 [Route("api/omnichannel")]
 [Produces("application/json")]

@@ -1,11 +1,13 @@
 using DessertERP.Application.Modules.InventoryManagement.DTOs;
 using DessertERP.Application.Modules.InventoryManagement.Services;
+using DessertERP.Application.Common.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DessertERP.Api.Controllers;
 
 [Authorize]
+[Authorize(Policy = PermissionKeys.InventoryAccess)]
 [ApiController]
 [Route("api/inventory")]
 public class InventoryManagementController : ControllerBase

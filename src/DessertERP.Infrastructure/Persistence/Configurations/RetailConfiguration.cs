@@ -54,6 +54,10 @@ public class POSTransactionConfiguration : IEntityTypeConfiguration<POSTransacti
         b.Property(e => e.ProcessingError).HasMaxLength(1000);
         b.Property(e => e.SourceFile).HasMaxLength(500);
         b.HasIndex(e => new { e.OrganizationId, e.TransactionNumber }).IsUnique();
+        b.HasIndex(e => new { e.OrganizationId, e.ExternalRef })
+            .IsUnique()
+            .HasFilter("\"ExternalRef\" IS NOT NULL");
+        b.HasIndex(e => e.RetailStatementId);
         b.HasIndex(e => e.Status);
 
         b.HasMany(e => e.Lines)
@@ -65,6 +69,42 @@ public class POSTransactionConfiguration : IEntityTypeConfiguration<POSTransacti
             .WithOne()
             .HasForeignKey(p => p.POSTransactionId)
             .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public class RetailStatementConfiguration : IEntityTypeConfiguration<RetailStatement>
+{
+    public void Configure(EntityTypeBuilder<RetailStatement> b)
+    {
+        b.ToTable("retail_statements");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.StatementNumber).HasMaxLength(60).IsRequired();
+        b.Property(e => e.Currency).HasMaxLength(3).IsRequired();
+        b.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+        b.Property(e => e.NetSales).HasColumnType("numeric(18,4)");
+        b.Property(e => e.DiscountTotal).HasColumnType("numeric(18,4)");
+        b.Property(e => e.TaxTotal).HasColumnType("numeric(18,4)");
+        b.Property(e => e.GrandTotal).HasColumnType("numeric(18,4)");
+        b.Property(e => e.CostTotal).HasColumnType("numeric(18,4)");
+        b.Property(e => e.PostingError).HasMaxLength(2000);
+        b.HasIndex(e => new { e.OrganizationId, e.StatementNumber }).IsUnique();
+        b.HasIndex(e => new { e.OrganizationId, e.StoreId, e.BusinessDate, e.Currency, e.Status });
+    }
+}
+
+public class RetailTenderSettlementConfiguration : IEntityTypeConfiguration<RetailTenderSettlement>
+{
+    public void Configure(EntityTypeBuilder<RetailTenderSettlement> b)
+    {
+        b.ToTable("retail_tender_settlements");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.PaymentMethod).HasConversion<string>().HasMaxLength(30);
+        b.Property(e => e.Amount).HasColumnType("numeric(18,4)");
+        b.Property(e => e.Currency).HasMaxLength(3).IsRequired();
+        b.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+        b.Property(e => e.ProcessorReference).HasMaxLength(200);
+        b.HasIndex(e => e.RetailStatementId);
+        b.HasIndex(e => new { e.OrganizationId, e.Status });
     }
 }
 

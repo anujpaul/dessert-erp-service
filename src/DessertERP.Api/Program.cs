@@ -5,6 +5,7 @@ using Microsoft.OpenApi.Models;
 
 
 using DessertERP.Application.Common.Interfaces;
+using DessertERP.Application.Common.Security;
 using DessertERP.Application.Common.Services;
 using DessertERP.Application.Modules.AccountsPayable.Services;
 using DessertERP.Application.Modules.AccountsReceivable.Services;
@@ -84,6 +85,7 @@ builder.Services.AddScoped<IFixedAssetService, FixedAssetService>();
 builder.Services.AddScoped<IDataManagementService, DataManagementService>();
 builder.Services.AddScoped<IBatchJobService, BatchJobService>();
 builder.Services.AddScoped<IRetailService, RetailService>();
+builder.Services.AddScoped<IRetailStatementService, RetailStatementService>();
 builder.Services.AddScoped<IMarketingService, MarketingService>();
 builder.Services.AddScoped<IPriceAgreementService, PriceAgreementService>();
 builder.Services.AddSingleton<IBlobStorageService, AzureBlobStorageService>();
@@ -139,7 +141,16 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    foreach (var permission in PermissionCatalog.PolicyKeys)
+    {
+        options.AddPolicy(permission, policy =>
+            policy.RequireAssertion(context =>
+                context.User.IsInRole("Admin") ||
+                context.User.HasClaim("permission", permission)));
+    }
+});
 
 // ── API ───────────────────────────────────────────────────────────────────────
 builder.Services.AddControllers()

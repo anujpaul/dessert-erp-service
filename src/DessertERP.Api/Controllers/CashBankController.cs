@@ -1,5 +1,6 @@
 using DessertERP.Application.Modules.CashBank;
 using DessertERP.Application.Modules.CashBank.DTOs;
+using DessertERP.Application.Common.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,6 +9,7 @@ namespace DessertERP.Api.Controllers;
 [ApiController]
 [Route("api/cash-bank")]
 [Authorize]
+[Authorize(Policy = PermissionKeys.CashBankAccess)]
 public class CashBankController : ControllerBase
 {
     private readonly ICashBankService _svc;

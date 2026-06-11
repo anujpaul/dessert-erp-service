@@ -1,12 +1,10 @@
 using DessertERP.Application.Modules.Expenses.Services;
-using DessertERP.Application.Common.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DessertERP.Api.Controllers;
 
 [Authorize]
-[Authorize(Policy = PermissionKeys.ExpenseAccess)]
 [ApiController]
 [Route("api/expenses")]
 public class ExpenseController : ControllerBase

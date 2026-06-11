@@ -1,5 +1,4 @@
 using DessertERP.Application.Common.Interfaces;
-using DessertERP.Application.Common.Security;
 using DessertERP.Application.Modules.ProductManagement.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,7 +8,6 @@ namespace DessertERP.Api.Controllers;
 [ApiController]
 [Route("api/price-agreements")]
 [Authorize]
-[Authorize(Policy = PermissionKeys.MarketingAccess)]
 [Produces("application/json")]
 public class PriceAgreementController : ControllerBase
 {

@@ -1,6 +1,5 @@
 using DessertERP.Application.Modules.FixedAssets;
 using DessertERP.Application.Modules.FixedAssets.DTOs;
-using DessertERP.Application.Common.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,7 +8,6 @@ namespace DessertERP.Api.Controllers;
 [ApiController]
 [Route("api/fixed-assets")]
 [Authorize]
-[Authorize(Policy = PermissionKeys.FixedAssetsAccess)]
 public class FixedAssetsController : ControllerBase
 {
     private readonly IFixedAssetService _svc;

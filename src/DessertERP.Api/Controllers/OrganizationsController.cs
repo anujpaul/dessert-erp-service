@@ -1,6 +1,5 @@
 using DessertERP.Application.Modules.Organization.DTOs;
 using DessertERP.Application.Modules.Organization.Services;
-using DessertERP.Application.Common.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,10 +15,12 @@ public class OrganizationsController : ControllerBase
     public OrganizationsController(IOrganizationService svc) => _svc = svc;
 
     [HttpGet]
+    [AllowAnonymous]
     public async Task<IActionResult> GetAll(CancellationToken ct)
         => Ok(await _svc.GetAllAsync(ct));
 
     [HttpGet("{id:guid}")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
     {
         var dto = await _svc.GetByIdAsync(id, ct);
@@ -27,8 +28,6 @@ public class OrganizationsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
-    [Authorize(Policy = PermissionKeys.SystemSettingsManage)]
     public async Task<IActionResult> Create([FromBody] CreateOrganizationRequest req, CancellationToken ct)
     {
         try { return StatusCode(201, await _svc.CreateAsync(req, ct)); }
@@ -36,8 +35,6 @@ public class OrganizationsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = "Admin")]
-    [Authorize(Policy = PermissionKeys.SystemSettingsManage)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateOrganizationRequest req, CancellationToken ct)
     {
         try { await _svc.UpdateAsync(id, req, ct); return NoContent(); }
@@ -45,8 +42,6 @@ public class OrganizationsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/suspend")]
-    [Authorize(Roles = "Admin")]
-    [Authorize(Policy = PermissionKeys.SystemSettingsManage)]
     public async Task<IActionResult> Suspend(Guid id, CancellationToken ct)
     {
         try { await _svc.SuspendAsync(id, ct); return NoContent(); }
@@ -54,8 +49,6 @@ public class OrganizationsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/activate")]
-    [Authorize(Roles = "Admin")]
-    [Authorize(Policy = PermissionKeys.SystemSettingsManage)]
     public async Task<IActionResult> Activate(Guid id, CancellationToken ct)
     {
         try { await _svc.ActivateAsync(id, ct); return NoContent(); }
@@ -64,7 +57,6 @@ public class OrganizationsController : ControllerBase
 
     [HttpDelete("{id:guid}")]
     [Authorize(Roles = "Admin")]
-    [Authorize(Policy = PermissionKeys.SystemSettingsManage)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         try { await _svc.DeleteAsync(id, ct); return NoContent(); }

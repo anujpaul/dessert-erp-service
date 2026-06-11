@@ -1,5 +1,4 @@
 using DessertERP.Application.Common.Interfaces;
-using DessertERP.Application.Common.Security;
 using DessertERP.Application.Modules.DataManagement.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,7 +6,6 @@ using Microsoft.AspNetCore.Mvc;
 namespace DessertERP.Api.Controllers;
 
 [Authorize]
-[Authorize(Policy = PermissionKeys.DataAccess)]
 [ApiController]
 [Route("api/dm")]
 [Produces("application/json")]

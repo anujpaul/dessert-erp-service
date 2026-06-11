@@ -16,9 +16,7 @@ public record UserDto(
     Guid Id, Guid OrganizationId,
     string Username, string Email, string FullName,
     string Status, DateTime? LastLoginAt,
-    IReadOnlyList<string> Roles,
-    IReadOnlyList<string> Permissions,
-    DateTime CreatedAt);
+    IReadOnlyList<string> Roles, DateTime CreatedAt);
 
 public record CreateUserRequest(
     string Username, string Email, string FullName,

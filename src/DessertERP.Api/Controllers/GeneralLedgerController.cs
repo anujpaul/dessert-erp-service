@@ -1,13 +1,11 @@
 using DessertERP.Application.Modules.GeneralLedger.DTOs;
 using DessertERP.Application.Modules.GeneralLedger.Services;
-using DessertERP.Application.Common.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DessertERP.Api.Controllers;
 
 [Authorize]
-[Authorize(Policy = PermissionKeys.GlAccess)]
 [ApiController]
 [Route("api/gl")]
 [Produces("application/json")]
@@ -124,7 +122,6 @@ public class GeneralLedgerController : ControllerBase
     }
 
     [HttpPost("journal-entries")]
-    [Authorize(Policy = PermissionKeys.GlJournalManage)]
     public async Task<IActionResult> CreateJournalEntry([FromBody] CreateJournalEntryRequest req, CancellationToken ct)
     {
         try { return StatusCode(201, await _svc.CreateJournalEntryAsync(req, ct)); }
@@ -132,7 +129,6 @@ public class GeneralLedgerController : ControllerBase
     }
 
     [HttpPost("journal-entries/{id:guid}/post")]
-    [Authorize(Policy = PermissionKeys.GlJournalPost)]
     public async Task<IActionResult> PostJournalEntry(Guid id, CancellationToken ct)
     {
         try { await _svc.PostJournalEntryAsync(id, ct); return NoContent(); }
@@ -140,7 +136,6 @@ public class GeneralLedgerController : ControllerBase
     }
 
     [HttpPost("journal-entries/{id:guid}/void")]
-    [Authorize(Policy = PermissionKeys.GlJournalPost)]
     public async Task<IActionResult> VoidJournalEntry(Guid id, CancellationToken ct)
     {
         try { await _svc.VoidJournalEntryAsync(id, ct); return NoContent(); }

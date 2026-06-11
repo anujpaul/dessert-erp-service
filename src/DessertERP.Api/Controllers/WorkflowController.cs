@@ -1,5 +1,4 @@
 using DessertERP.Application.Modules.Workflow.Services;
-using DessertERP.Application.Common.Security;
 using DessertERP.Domain.Modules.Workflow;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,7 +6,6 @@ using Microsoft.AspNetCore.Mvc;
 namespace DessertERP.Api.Controllers;
 
 [Authorize]
-[Authorize(Policy = PermissionKeys.WorkflowAccess)]
 [ApiController]
 [Route("api/workflow")]
 public class WorkflowController : ControllerBase

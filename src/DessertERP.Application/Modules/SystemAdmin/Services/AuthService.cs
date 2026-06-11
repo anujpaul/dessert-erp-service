@@ -1,5 +1,4 @@
 using DessertERP.Application.Common.Interfaces;
-using DessertERP.Application.Common.Security;
 using DessertERP.Application.Modules.SystemAdmin.DTOs;
 using DessertERP.Domain.Modules.SystemAdmin;
 using Microsoft.EntityFrameworkCore;
@@ -37,13 +36,12 @@ public class AuthService : IAuthService
         }
 
         var roles       = user.UserRoles.Where(ur => ur.Role != null).Select(ur => ur.Role!.Name).ToList();
-        var storedPermissions = user.UserRoles
+        var permissions = user.UserRoles
             .Where(ur => ur.Role != null)
             .SelectMany(ur => ur.Role!.Permissions)
             .Select(p => $"{p.Module}:{p.Action}")
             .Distinct()
             .ToList();
-        var permissions = PermissionCatalog.ExpandForRoles(storedPermissions, roles).Order().ToList();
 
         var accessToken  = _jwt.GenerateAccessToken(user, roles, permissions);
         var refreshToken = _jwt.GenerateRefreshToken();
@@ -59,7 +57,7 @@ public class AuthService : IAuthService
 
         return new LoginResponse(accessToken, refreshToken, _jwt.AccessTokenExpiry,
             new UserDto(user.Id, user.OrganizationId, user.Username, user.Email, user.FullName,
-                user.Status.ToString(), user.LastLoginAt, roles, permissions, user.CreatedAt));
+                user.Status.ToString(), user.LastLoginAt, roles, user.CreatedAt));
     }
 
     public async Task<LoginResponse> RefreshAsync(RefreshTokenRequest req, string? ipAddress, CancellationToken ct = default)
@@ -73,13 +71,12 @@ public class AuthService : IAuthService
             throw new InvalidOperationException("Refresh token has expired. Please log in again.");
 
         var roles       = user.UserRoles.Where(ur => ur.Role != null).Select(ur => ur.Role!.Name).ToList();
-        var storedPermissions = user.UserRoles
+        var permissions = user.UserRoles
             .Where(ur => ur.Role != null)
             .SelectMany(ur => ur.Role!.Permissions)
             .Select(p => $"{p.Module}:{p.Action}")
             .Distinct()
             .ToList();
-        var permissions = PermissionCatalog.ExpandForRoles(storedPermissions, roles).Order().ToList();
 
         var accessToken  = _jwt.GenerateAccessToken(user, roles, permissions);
         var refreshToken = _jwt.GenerateRefreshToken();
@@ -89,7 +86,7 @@ public class AuthService : IAuthService
 
         return new LoginResponse(accessToken, refreshToken, _jwt.AccessTokenExpiry,
             new UserDto(user.Id, user.OrganizationId, user.Username, user.Email, user.FullName,
-                user.Status.ToString(), user.LastLoginAt, roles, permissions, user.CreatedAt));
+                user.Status.ToString(), user.LastLoginAt, roles, user.CreatedAt));
     }
 
     public async Task LogoutAsync(Guid userId, CancellationToken ct = default)

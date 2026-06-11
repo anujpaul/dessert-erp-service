@@ -207,7 +207,7 @@ using (var scope = app.Services.CreateScope())
     var db     = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
-    if (builder.Configuration.GetValue("DatabaseInitialization:ApplyMigrationsOnStartup", true))
+    if (builder.Configuration.GetValue("DatabaseInitialization:ApplyMigrationsOnStartup", false))
     {
         var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         await db.Database.MigrateAsync();

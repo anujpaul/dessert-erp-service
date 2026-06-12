@@ -3,6 +3,7 @@ using DessertERP.Application.Common.Security;
 using DessertERP.Application.Modules.DataManagement.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Xml;
 
 namespace DessertERP.Api.Controllers;
 
@@ -63,6 +64,12 @@ public class DataManagementController : ControllerBase
         if (file is null || file.Length == 0)
             return BadRequest(new { error = "No file uploaded." });
 
+        if (await IsRetailPosLogAsync(file, ct))
+            return BadRequest(new
+            {
+                error = "This file is a retail POSLog transaction. Select RetailTransaction as the entity type so it can be imported and posted through Retail Statements."
+            });
+
         var filePath = await SaveUploadedFile(file, ct);
         var job = await _svc.CreateImportJobAsync(
             _org.OrganizationId, entityType, fileFormat,
@@ -88,6 +95,12 @@ public class DataManagementController : ControllerBase
     {
         if (file is null || file.Length == 0)
             return BadRequest(new { error = "No file uploaded." });
+
+        if (await IsRetailPosLogAsync(file, ct))
+            return BadRequest(new
+            {
+                error = "Retail POSLog transactions cannot use generic staging. Select RetailTransaction and use Import Now."
+            });
 
         var filePath = await SaveUploadedFile(file, ct);
         var job = await _svc.CreateImportJobAsync(
@@ -167,5 +180,35 @@ public class DataManagementController : ControllerBase
         await using var fs = System.IO.File.Create(filePath);
         await file.CopyToAsync(fs, ct);
         return filePath;
+    }
+
+    private static async Task<bool> IsRetailPosLogAsync(IFormFile file, CancellationToken ct)
+    {
+        if (!file.FileName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(file.ContentType, "application/xml", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(file.ContentType, "text/xml", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        await using var stream = file.OpenReadStream();
+        using var reader = XmlReader.Create(stream, new XmlReaderSettings
+        {
+            Async = true,
+            DtdProcessing = DtdProcessing.Prohibit,
+            IgnoreComments = true,
+            IgnoreWhitespace = true
+        });
+
+        while (await reader.ReadAsync())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (reader.NodeType != XmlNodeType.Element ||
+                !string.Equals(reader.LocalName, "TransactionDomainSpecific", StringComparison.Ordinal))
+                continue;
+
+            return string.Equals(reader.GetAttribute("TypeCode"), "RetailTransaction",
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        return false;
     }
 }

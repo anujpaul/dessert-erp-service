@@ -108,6 +108,72 @@ public class RetailTenderSettlementConfiguration : IEntityTypeConfiguration<Reta
     }
 }
 
+public class RetailTransactionStagingConfiguration : IEntityTypeConfiguration<RetailTransactionStaging>
+{
+    public void Configure(EntityTypeBuilder<RetailTransactionStaging> b)
+    {
+        b.ToTable("retail_transaction_staging");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.SourceFile).HasMaxLength(500).IsRequired();
+        b.Property(e => e.SourceHash).HasMaxLength(64).IsRequired();
+        b.Property(e => e.RawXml).HasColumnType("text").IsRequired();
+        b.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+        b.Property(e => e.StoreCode).HasMaxLength(20).IsRequired();
+        b.Property(e => e.TransactionNumber).HasMaxLength(100).IsRequired();
+        b.Property(e => e.OperatorId).HasMaxLength(100);
+        b.Property(e => e.Currency).HasMaxLength(3).IsRequired();
+        b.Property(e => e.SubTotal).HasColumnType("numeric(18,4)");
+        b.Property(e => e.DiscountTotal).HasColumnType("numeric(18,4)");
+        b.Property(e => e.TaxTotal).HasColumnType("numeric(18,4)");
+        b.Property(e => e.GrandTotal).HasColumnType("numeric(18,4)");
+        b.Property(e => e.ValidationMessage).HasMaxLength(4000);
+        b.HasIndex(e => new { e.OrganizationId, e.SourceHash }).IsUnique();
+        b.HasIndex(e => new { e.OrganizationId, e.TransactionNumber });
+        b.HasIndex(e => new { e.OrganizationId, e.Status, e.CreatedAt });
+
+        b.HasMany(e => e.Lines).WithOne()
+            .HasForeignKey(e => e.RetailTransactionStagingId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.HasMany(e => e.Tenders).WithOne()
+            .HasForeignKey(e => e.RetailTransactionStagingId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public class RetailTransactionStagingLineConfiguration : IEntityTypeConfiguration<RetailTransactionStagingLine>
+{
+    public void Configure(EntityTypeBuilder<RetailTransactionStagingLine> b)
+    {
+        b.ToTable("retail_transaction_staging_lines");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.Sku).HasMaxLength(100).IsRequired();
+        b.Property(e => e.PosItemId).HasMaxLength(100);
+        b.Property(e => e.ProductName).HasMaxLength(300).IsRequired();
+        b.Property(e => e.UnitOfMeasure).HasMaxLength(20);
+        b.Property(e => e.Quantity).HasColumnType("numeric(18,4)");
+        b.Property(e => e.UnitPrice).HasColumnType("numeric(18,4)");
+        b.Property(e => e.DiscountAmount).HasColumnType("numeric(18,4)");
+        b.Property(e => e.TaxAmount).HasColumnType("numeric(18,4)");
+        b.Property(e => e.LineSubTotal).HasColumnType("numeric(18,4)");
+        b.Property(e => e.LineTotal).HasColumnType("numeric(18,4)");
+        b.Property(e => e.ValidationMessage).HasMaxLength(1000);
+        b.HasIndex(e => new { e.RetailTransactionStagingId, e.LineNumber }).IsUnique();
+    }
+}
+
+public class RetailTransactionStagingTenderConfiguration : IEntityTypeConfiguration<RetailTransactionStagingTender>
+{
+    public void Configure(EntityTypeBuilder<RetailTransactionStagingTender> b)
+    {
+        b.ToTable("retail_transaction_staging_tenders");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.PaymentMethod).HasConversion<string>().HasMaxLength(30);
+        b.Property(e => e.Amount).HasColumnType("numeric(18,4)");
+        b.Property(e => e.Reference).HasMaxLength(200);
+        b.HasIndex(e => new { e.RetailTransactionStagingId, e.Sequence }).IsUnique();
+    }
+}
+
 public class POSTransactionLineConfiguration : IEntityTypeConfiguration<POSTransactionLine>
 {
     public void Configure(EntityTypeBuilder<POSTransactionLine> b)

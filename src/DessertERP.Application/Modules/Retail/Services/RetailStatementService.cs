@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Cryptography;
+using System.Text;
 using System.Xml.Linq;
 using DessertERP.Application.Common.Interfaces;
 using DessertERP.Domain.Modules.AccountsReceivable;
@@ -12,8 +13,15 @@ using Microsoft.Extensions.Logging;
 
 namespace DessertERP.Application.Modules.Retail.Services;
 
-public record RetailImportResult(Guid TransactionId, Guid StatementId, string TransactionNumber,
-    bool Duplicate, int MatchedLines, int UnmatchedLines);
+public record RetailImportResult(Guid StagingId, string StagingStatus, Guid? TransactionId,
+    Guid? StatementId, string TransactionNumber, bool Duplicate,
+    int MatchedLines, int UnmatchedLines, string? ValidationMessage);
+
+public record RetailStagingDto(Guid Id, string SourceFile, string SourceHash, string Status,
+    string StoreCode, string TransactionNumber, DateTime BusinessDate, DateTime TransactionDate,
+    string Currency, decimal GrandTotal, int LineCount, int TenderCount,
+    int MatchedLines, int UnmatchedLines, string? ValidationMessage,
+    Guid? PromotedTransactionId, Guid? RetailStatementId, DateTime CreatedAt, DateTime? PromotedAt);
 
 public record RetailStatementDto(Guid Id, string StatementNumber, Guid StoreId, string StoreName,
     DateTime BusinessDate, string Currency, string Status, int TransactionCount,
@@ -29,6 +37,12 @@ public interface IRetailStatementService
 {
     Task<RetailImportResult> ImportPosLogAsync(Guid organizationId, Stream xml,
         string sourceFile, CancellationToken ct = default);
+    Task<RetailStagingDto> StagePosLogAsync(Guid organizationId, Stream xml,
+        string sourceFile, CancellationToken ct = default);
+    Task<RetailImportResult> PromoteStagedAsync(Guid stagingId,
+        CancellationToken ct = default);
+    Task<List<RetailStagingDto>> GetStagedTransactionsAsync(Guid organizationId,
+        int page = 1, int pageSize = 100, CancellationToken ct = default);
     Task<int> PostOpenStatementsAsync(Guid organizationId, CancellationToken ct = default);
     Task PostStatementAsync(Guid statementId, CancellationToken ct = default);
     Task<List<RetailStatementDto>> GetStatementsAsync(Guid organizationId,
@@ -53,13 +67,177 @@ public class RetailStatementService : IRetailStatementService
     public async Task<RetailImportResult> ImportPosLogAsync(Guid organizationId, Stream xml,
         string sourceFile, CancellationToken ct = default)
     {
-        var parsed = await ParseAsync(xml, ct);
+        var staged = await StagePosLogAsync(organizationId, xml, sourceFile, ct);
+        if (staged.Status is nameof(RetailStagingStatus.Invalid) or nameof(RetailStagingStatus.Failed))
+            return new RetailImportResult(staged.Id, staged.Status, null, null,
+                staged.TransactionNumber, false, staged.MatchedLines, staged.UnmatchedLines,
+                staged.ValidationMessage);
+
+        return await PromoteStagedAsync(staged.Id, ct);
+    }
+
+    public async Task<RetailStagingDto> StagePosLogAsync(Guid organizationId, Stream xml,
+        string sourceFile, CancellationToken ct = default)
+    {
+        await using var source = new MemoryStream();
+        await xml.CopyToAsync(source, ct);
+        var bytes = source.ToArray();
+        var sourceHash = Convert.ToHexString(SHA256.HashData(bytes));
+
+        var existing = await _db.RetailTransactionStaging
+            .Include(s => s.Lines)
+            .Include(s => s.Tenders)
+            .FirstOrDefaultAsync(s => s.OrganizationId == organizationId &&
+                s.SourceHash == sourceHash, ct);
+        if (existing is not null)
+            return ToStagingDto(existing);
+
+        source.Position = 0;
+        string rawXml;
+        using (var reader = new StreamReader(source, Encoding.UTF8, true, leaveOpen: true))
+            rawXml = await reader.ReadToEndAsync(ct);
+        source.Position = 0;
+        var parsed = await ParseAsync(source, ct);
+
+        var staging = new RetailTransactionStaging(organizationId, sourceFile, sourceHash,
+            rawXml, parsed.StoreCode, parsed.TransactionId, parsed.OperatorId,
+            parsed.BusinessDate, parsed.TransactionDate, parsed.Currency, parsed.IsReturn,
+            parsed.SubTotal, parsed.DiscountTotal, parsed.TaxTotal, parsed.GrandTotal);
+
+        var identifiers = parsed.Lines
+            .SelectMany(l => new[] { l.Sku, l.PosItemId })
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var variants = await _db.ProductVariants
+            .Where(v => v.OrganizationId == organizationId &&
+                (identifiers.Contains(v.Sku) ||
+                    (v.Barcode != null && identifiers.Contains(v.Barcode))))
+            .ToListAsync(ct);
+
+        ProductVariant? Match(ParsedLine line) => variants.FirstOrDefault(v =>
+            string.Equals(v.Sku, line.Sku, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(v.Barcode, line.Sku, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(v.Sku, line.PosItemId, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(v.Barcode, line.PosItemId, StringComparison.OrdinalIgnoreCase));
+
+        var lineNumber = 0;
+        foreach (var parsedLine in parsed.Lines)
+        {
+            var line = new RetailTransactionStagingLine(staging.Id, ++lineNumber,
+                parsedLine.Sku, parsedLine.PosItemId, parsedLine.ProductName,
+                parsedLine.Quantity, parsedLine.UnitPrice, parsedLine.DiscountAmount,
+                parsedLine.TaxAmount, parsedLine.LineSubTotal, parsedLine.LineTotal,
+                parsedLine.UnitOfMeasure, parsedLine.IsReturn);
+            var variant = Match(parsedLine);
+            line.SetProductMatch(variant?.Id, variant is null ? "No product variant matched this SKU." : null);
+            staging.AddLine(line);
+        }
+
+        var tenderSequence = 0;
+        foreach (var payment in parsed.Payments)
+            staging.AddTender(new RetailTransactionStagingTender(staging.Id, ++tenderSequence,
+                payment.Method, payment.Amount, payment.Reference));
+
+        var validationErrors = new List<string>();
+        var existingTransaction = await _db.POSTransactions.AnyAsync(t =>
+            t.OrganizationId == organizationId && t.ExternalRef == parsed.TransactionId, ct);
+        if (existingTransaction)
+            validationErrors.Add($"Transaction {parsed.TransactionId} already exists in operational tables.");
+
+        var lineTotal = parsed.Lines.Sum(l => l.LineTotal);
+        if (Math.Abs(lineTotal - parsed.GrandTotal) > 0.02m)
+            validationErrors.Add(
+                $"Line total {lineTotal:0.00} does not match transaction total {parsed.GrandTotal:0.00}.");
+
+        var tenderTotal = parsed.Payments.Sum(p => p.Amount);
+        if (Math.Abs(tenderTotal - parsed.GrandTotal) > 0.02m)
+            validationErrors.Add(
+                $"Tender total {tenderTotal:0.00} does not match transaction total {parsed.GrandTotal:0.00}.");
+
+        var unmatched = staging.Lines.Count(l => l.MatchedProductVariantId is null);
+        if (validationErrors.Count > 0)
+            staging.MarkInvalid(string.Join(" ", validationErrors));
+        else
+            staging.MarkValid(unmatched > 0
+                ? $"{unmatched} line(s) have no matching product variant and will be promoted without an inventory match."
+                : null);
+
+        _db.RetailTransactionStaging.Add(staging);
+        await _db.SaveChangesAsync(ct);
+        return ToStagingDto(staging);
+    }
+
+    public async Task<RetailImportResult> PromoteStagedAsync(Guid stagingId,
+        CancellationToken ct = default)
+    {
+        var staging = await _db.RetailTransactionStaging
+            .Include(s => s.Lines)
+            .Include(s => s.Tenders)
+            .FirstOrDefaultAsync(s => s.Id == stagingId, ct)
+            ?? throw new InvalidOperationException("Retail staging transaction not found.");
+
+        if (staging.Status == RetailStagingStatus.Promoted)
+            return new RetailImportResult(staging.Id, staging.Status.ToString(),
+                staging.PromotedTransactionId, staging.RetailStatementId,
+                staging.TransactionNumber, true,
+                staging.Lines.Count(l => l.MatchedProductVariantId is not null),
+                staging.Lines.Count(l => l.MatchedProductVariantId is null), null);
+        if (staging.Status != RetailStagingStatus.Valid)
+            throw new InvalidOperationException(
+                $"Only valid staged transactions can be promoted. Current status: {staging.Status}. {staging.ValidationMessage}");
+
+        var parsed = new ParsedTransaction(staging.StoreCode, staging.TransactionNumber,
+            staging.OperatorId, staging.BusinessDate, staging.TransactionDate, staging.Currency,
+            staging.IsReturn, staging.SubTotal, staging.DiscountTotal, staging.TaxTotal,
+            staging.GrandTotal,
+            staging.Lines.OrderBy(l => l.LineNumber).Select(l => new ParsedLine(
+                l.Sku, l.PosItemId, l.ProductName, l.Quantity, l.UnitPrice,
+                l.DiscountAmount, l.TaxAmount, l.LineSubTotal, l.LineTotal,
+                l.UnitOfMeasure, l.IsReturn)).ToList(),
+            staging.Tenders.OrderBy(t => t.Sequence).Select(t =>
+                new ParsedPayment(t.PaymentMethod, t.Amount, t.Reference)).ToList());
+
+        var result = await PromoteParsedAsync(staging.OrganizationId, parsed,
+            staging.SourceFile, ct);
+        if (result.TransactionId is null || result.StatementId is null)
+            throw new InvalidOperationException(
+                "The staged transaction could not be linked to an operational transaction and statement.");
+        staging.MarkPromoted(result.TransactionId.Value, result.StatementId.Value);
+        await _db.SaveChangesAsync(ct);
+        return result with
+        {
+            StagingId = staging.Id,
+            StagingStatus = staging.Status.ToString(),
+            ValidationMessage = null
+        };
+    }
+
+    public async Task<List<RetailStagingDto>> GetStagedTransactionsAsync(Guid organizationId,
+        int page = 1, int pageSize = 100, CancellationToken ct = default)
+    {
+        var rows = await _db.RetailTransactionStaging
+            .AsNoTracking()
+            .Include(s => s.Lines)
+            .Include(s => s.Tenders)
+            .Where(s => s.OrganizationId == organizationId)
+            .OrderByDescending(s => s.CreatedAt)
+            .Skip((Math.Max(1, page) - 1) * Math.Clamp(pageSize, 1, 500))
+            .Take(Math.Clamp(pageSize, 1, 500))
+            .ToListAsync(ct);
+        return rows.Select(ToStagingDto).ToList();
+    }
+
+    private async Task<RetailImportResult> PromoteParsedAsync(Guid organizationId,
+        ParsedTransaction parsed, string sourceFile, CancellationToken ct)
+    {
         var duplicate = await _db.POSTransactions
             .FirstOrDefaultAsync(t => t.OrganizationId == organizationId &&
                 t.ExternalRef == parsed.TransactionId, ct);
         if (duplicate is not null)
-            return new RetailImportResult(duplicate.Id, duplicate.RetailStatementId ?? Guid.Empty,
-                duplicate.TransactionNumber, true, 0, 0);
+            return new RetailImportResult(Guid.Empty, RetailStagingStatus.Promoted.ToString(),
+                duplicate.Id, duplicate.RetailStatementId, duplicate.TransactionNumber,
+                true, 0, parsed.Lines.Count, null);
 
         var store = await _db.RetailStores
             .FirstOrDefaultAsync(s => s.OrganizationId == organizationId &&
@@ -136,11 +314,20 @@ public class RetailStatementService : IRetailStatementService
 
         statement.AddTransaction(parsed.SubTotal, parsed.DiscountTotal, parsed.TaxTotal,
             parsed.GrandTotal, costTotal);
-        await _db.SaveChangesAsync(ct);
-
-        return new RetailImportResult(tx.Id, statement.Id, tx.TransactionNumber, false,
-            matched, parsed.Lines.Count - matched);
+        return new RetailImportResult(Guid.Empty, RetailStagingStatus.Valid.ToString(),
+            tx.Id, statement.Id, tx.TransactionNumber, false,
+            matched, parsed.Lines.Count - matched, null);
     }
+
+    private static RetailStagingDto ToStagingDto(RetailTransactionStaging staging)
+        => new(staging.Id, staging.SourceFile, staging.SourceHash, staging.Status.ToString(),
+            staging.StoreCode, staging.TransactionNumber, staging.BusinessDate,
+            staging.TransactionDate, staging.Currency, staging.GrandTotal,
+            staging.Lines.Count, staging.Tenders.Count,
+            staging.Lines.Count(l => l.MatchedProductVariantId is not null),
+            staging.Lines.Count(l => l.MatchedProductVariantId is null),
+            staging.ValidationMessage, staging.PromotedTransactionId,
+            staging.RetailStatementId, staging.CreatedAt, staging.PromotedAt);
 
     public async Task<int> PostOpenStatementsAsync(Guid organizationId, CancellationToken ct = default)
     {
@@ -475,12 +662,21 @@ public class RetailStatementService : IRetailStatementService
                 productName = (string?)Desc("ItemID")?.Attribute("Name") ?? sku;
             var unitPrice = Math.Abs(Money(Desc("RegularSalesUnitPrice")));
             if (unitPrice == 0) unitPrice = Math.Abs(Money(Desc("ActualSalesUnitPrice")));
-            var net = Money(Desc("ExtendedAmountWithoutTax"));
             var gross = quantity * unitPrice;
-            var discount = gross - net;
-            var tax = merchandise.Descendants().Where(e => e.Name.LocalName == "Tax")
-                .SelectMany(e => e.Descendants().Where(x => x.Name.LocalName == "Amount"))
-                .Sum(Money);
+            var amounts = merchandise.Descendants().FirstOrDefault(e => e.Name.LocalName == "Amounts");
+            var netElement = amounts?.Elements().FirstOrDefault(e =>
+                e.Name.LocalName == "Amount" &&
+                string.Equals((string?)e.Attribute("AmountType"), "NetAmount",
+                    StringComparison.OrdinalIgnoreCase));
+            var netMagnitude = Math.Abs(Money(netElement));
+            if (netMagnitude == 0)
+                netMagnitude = Math.Abs(Money(Desc("ExtendedAmountWithoutTax")));
+            var net = isReturn ? -netMagnitude : netMagnitude;
+            var discount = Math.Max(0m, Math.Abs(gross) - netMagnitude);
+            var totalTax = merchandise.Descendants().FirstOrDefault(e =>
+                e.Name.LocalName == "TotalTaxAmount");
+            var taxMagnitude = Math.Abs(Money(totalTax));
+            var tax = isReturn ? -taxMagnitude : taxMagnitude;
             var uom = (string?)Desc("Quantity")?.Attribute("UnitOfMeasureCode") ?? "EA";
             lines.Add(new ParsedLine(sku, posItemId, productName, quantity, unitPrice,
                 discount, tax, gross, net + tax, uom, isReturn));

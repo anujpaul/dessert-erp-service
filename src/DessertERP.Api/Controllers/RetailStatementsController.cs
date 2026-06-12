@@ -36,6 +36,13 @@ public class RetailStatementsController : ControllerBase
         => Ok(await _service.GetSettlementsAsync(
             _organization.OrganizationId, status, ct));
 
+    [HttpGet("staging")]
+    public async Task<IActionResult> GetStaging(
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 100,
+        CancellationToken ct = default)
+        => Ok(await _service.GetStagedTransactionsAsync(
+            _organization.OrganizationId, page, pageSize, ct));
+
     [HttpPost("import")]
     [RequestSizeLimit(100 * 1024 * 1024)]
     public async Task<IActionResult> Import(IFormFile file,
@@ -49,8 +56,31 @@ public class RetailStatementsController : ControllerBase
         try
         {
             await using var stream = file.OpenReadStream();
+            if (!post)
+                return Ok(await _service.StagePosLogAsync(
+                    _organization.OrganizationId, stream, file.FileName, ct));
+
             var result = await _service.ImportPosLogAsync(
                 _organization.OrganizationId, stream, file.FileName, ct);
+            if (result.TransactionId is null)
+                return UnprocessableEntity(result);
+            if (!result.Duplicate)
+                await _service.PostOpenStatementsAsync(_organization.OrganizationId, ct);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPost("staging/{id:guid}/promote")]
+    public async Task<IActionResult> PromoteStaged(Guid id,
+        [FromQuery] bool post = true, CancellationToken ct = default)
+    {
+        try
+        {
+            var result = await _service.PromoteStagedAsync(id, ct);
             if (post && !result.Duplicate)
                 await _service.PostOpenStatementsAsync(_organization.OrganizationId, ct);
             return Ok(result);

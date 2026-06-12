@@ -1,0 +1,640 @@
+<com.tcs.retail.store.poslog.TransactionDomainSpecific TypeCode="RetailTransaction" TrainingModeFlag="false">
+  <BusinessUnit>
+    <UnitID TypeCode="RetailStore">1</UnitID>
+  </BusinessUnit>
+  <WorkstationID WorkstationNumber="4">216</WorkstationID>
+  <SequenceNumber>33</SequenceNumber>
+  <TransactionID>RT0012161404250332</TransactionID>
+  <OrganizationalHierarchy Level="Store Type" ID="3" Hierarchy="Full Retail"></OrganizationalHierarchy>
+  <OperatorID OperatorName="Leesa Schlimgen">LSCHLIMGEN</OperatorID>
+  <Currency>USD</Currency>
+  <CustomerOrderTransaction TypeCode="RETAIL" TransactionStatus="Finished">
+    <ItemCount>1</ItemCount>
+    <LineItem CancelFlag="false" Action="Add" EntryMethod="SCAN">
+      <SequenceNumber>1</SequenceNumber>
+      <Sale ItemType="ST">
+        <POSIdentity>
+          <POSItemID>000112348</POSItemID>
+        </POSIdentity>
+        <ItemID Name="No-Crack 4-oz. Lemon Hand Cream" Type="EAN13">47524</ItemID>
+        <MerchandiseHierarchy ID="3006622">47524</MerchandiseHierarchy>
+        <Description TypeCode="short">No-Crack 4-oz. Lemon Hand Cream</Description>
+        <LongDescription TypeCode="long">No-Crack 4-oz. Lemon Hand Cream</LongDescription>
+        <RegularSalesUnitPrice Currency="USD" L10nAmount="$8.95" SegmentID="RETAIL_PRICE_SGMT" ScaleQuantity="1" PriceType="RETAIL">
+          <value>8.95</value>
+        </RegularSalesUnitPrice>
+        <ActualSalesUnitPrice Currency="USD" L10nAmount="$8.95">
+          <value>8.95</value>
+        </ActualSalesUnitPrice>
+        <ActualSalesUnitPriceWithoutTax Currency="USD" L10nAmount="$8.95">
+          <value>8.95</value>
+        </ActualSalesUnitPriceWithoutTax>
+        <ExtendedAmount Currency="USD" L10nAmount="$8.95">
+          <value>8.95</value>
+        </ExtendedAmount>
+        <ExtendedAmountWithoutTax Currency="USD" L10nAmount="$8.95">
+          <value>8.95</value>
+        </ExtendedAmountWithoutTax>
+        <DiscountUnitPrice Currency="USD" L10nAmount="$8.95">8.95</DiscountUnitPrice>
+        <TransactionDiscountProratedAmount Currency="USD" L10nAmount="$0.00">0.00</TransactionDiscountProratedAmount>
+        <EmployeeDiscountProratedAmount Currency="USD" L10nAmount="$0.00">0.00</EmployeeDiscountProratedAmount>
+        <TransactionPromotionProratedAmount Currency="USD" L10nAmount="-$0.45">-0.45</TransactionPromotionProratedAmount>
+        <Quantity Units="1.00" UnitOfMeasureCode="EA" L10nQuantity="1" PackageSize="">1</Quantity>
+        <RetailPriceModifier MethodCode="PROMOTIONS" TypeCode="Sale">
+          <SequenceNumber>1</SequenceNumber>
+          <Amount Currency="USD" L10nAmount="-$0.45">-0.45</Amount>
+          <PromotionID TypeCode="1" PromotionType="TXN">
+            <value>RTL5OFF</value>
+          </PromotionID>
+          <OperatorDisplayText>5% off No Min + Free Shipping</OperatorDisplayText>
+          <CustomerDisplayText>Coupon discount</CustomerDisplayText>
+          <ReceiptPrintText>5% off No Min + Free Shipping</ReceiptPrintText>
+          <TotalAmount Currency="USD" L10nAmount="-$0.45">-0.45</TotalAmount>
+          <OperatorID OperatorName="Leesa Schlimgen">LSCHLIMGEN</OperatorID>
+          <PromotionThresholdType>TXN_AMOUNT</PromotionThresholdType>
+        </RetailPriceModifier>
+        <Tax TaxType="ST" TaxSubType="NRML">
+          <TaxableAmount Currency="USD" L10nAmount="$8.50" TaxIncludedInTaxableAmountFlag="false">
+            <value>8.50</value>
+          </TaxableAmount>
+          <Amount Currency="USD" L10nAmount="$0.43">
+            <value>0.43</value>
+          </Amount>
+          <Percent>5.0000</Percent>
+          <TaxGroupID Name="">2930450</TaxGroupID>
+          <TaxJurisdictionID>
+            <string>42029</string>
+          </TaxJurisdictionID>
+          <ProductTaxClassificationCode>800000007</ProductTaxClassificationCode>
+          <TaxRateRuleID>1</TaxRateRuleID>
+          <TaxRateRuleName> 0</TaxRateRuleName>
+        </Tax>
+        <Tax TaxType="ST" TaxSubType="NRML">
+          <TaxableAmount Currency="USD" L10nAmount="$8.50" TaxIncludedInTaxableAmountFlag="false">
+            <value>8.50</value>
+          </TaxableAmount>
+          <Amount Currency="USD" L10nAmount="$0.04">
+            <value>0.04</value>
+          </Amount>
+          <Percent>0.5000</Percent>
+          <TaxGroupID Name="">2933005</TaxGroupID>
+          <TaxJurisdictionID>
+            <string>42184</string>
+          </TaxJurisdictionID>
+          <ProductTaxClassificationCode>800000007</ProductTaxClassificationCode>
+          <TaxRateRuleID>1</TaxRateRuleID>
+          <TaxRateRuleName> 0</TaxRateRuleName>
+        </Tax>
+        <TotalTaxAmount Currency="USD" L10nAmount="$0.47">
+          <value>0.47</value>
+        </TotalTaxAmount>
+        <ReturnableFlag>true</ReturnableFlag>
+        <NonDiscountableFlag>false</NonDiscountableFlag>
+        <RelatedItem>
+          <Members/>
+        </RelatedItem>
+        <AgeRestrictionByPassByCashier>false</AgeRestrictionByPassByCashier>
+        <WeightEntryRequiredFlag>false</WeightEntryRequiredFlag>
+        <WeightEntryDoneFlag>false</WeightEntryDoneFlag>
+        <QuantityEntryRequiredFlag>false</QuantityEntryRequiredFlag>
+        <IsUomItem>false</IsUomItem>
+        <QuantityEntryDoneFlag>false</QuantityEntryDoneFlag>
+        <Amounts>
+          <Amount AmountType="GrossAmount" L10nAmount="$8.95" Currency="USD">8.95</Amount>
+          <Amount AmountType="SavingsAmount" L10nAmount="-$0.45" Currency="USD">-0.45</Amount>
+          <Amount AmountType="NetAmount" L10nAmount="$8.50" Currency="USD">8.50</Amount>
+          <Amount AmountType="GrossAmountAfterPriceOverride" L10nAmount="$8.95" Currency="USD">8.95</Amount>
+          <Amount AmountType="TaxOnGrossAmount" L10nAmount="$0.49" Currency="USD">0.49</Amount>
+          <Amount AmountType="TaxOnNetAmount" L10nAmount="$0.47" Currency="USD">0.47</Amount>
+        </Amounts>
+        <DiscountCardProratedAmount Currency="USD" L10nAmount="$0.00">0.00</DiscountCardProratedAmount>
+        <AgeRestrictedItemDeclinedByCashier>false</AgeRestrictedItemDeclinedByCashier>
+        <ChainOfCustody/>
+        <ReturnValues>
+          <UnitReturnAmount UnitReturnIndex="1" L10nAmount="-$8.50" L10nTaxAmount="-$0.47" UnitReturnAmount="-8.50" UnitReturnTaxAmount="-0.47" Quantity="1" Currency="USD">
+            <PromotionAppliedDetail>
+              <BenefitAmount Currency="USD" L10nAmount="-$0.45">-0.45</BenefitAmount>
+              <RetailPriceModifierSequenceNumber>1</RetailPriceModifierSequenceNumber>
+            </PromotionAppliedDetail>
+          </UnitReturnAmount>
+        </ReturnValues>
+        <FlatTaxes/>
+        <TaxExemptionEligibility>true</TaxExemptionEligibility>
+        <ItemWarranty/>
+        <ItemImages>
+          <ItemImage Type="Thumbnail">https://production-duluthtrading-pfsweb.demandware.net/dw/image/v2/BBNM_PRD/on/demandware.static/-/Sites-dtc-master-catalog/default/v2029522edc43d9a12a0873954961ec15d8aa3867/images/large/47524_master.jpg</ItemImage>
+        </ItemImages>
+        <LoyaltyVoucherProratedAmount Currency="USD" L10nAmount="$0.00">0.00</LoyaltyVoucherProratedAmount>
+        <Brand>
+          <BrandName>DTC</BrandName>
+        </Brand>
+        <NmSubBrand></NmSubBrand>
+        <ItemNotOnFileFlag>false</ItemNotOnFileFlag>
+        <DepartmentSaleFlag>false</DepartmentSaleFlag>
+        <TaxIncludedInPriceFlag>false</TaxIncludedInPriceFlag>
+        <ReturnFlag>false</ReturnFlag>
+        <TransactionNotFoundFlag>false</TransactionNotFoundFlag>
+        <MerchandiseHierarchyGroupID>3006622</MerchandiseHierarchyGroupID>
+        <AllowTradeInFlag>false</AllowTradeInFlag>
+        <SellingStatusCode></SellingStatusCode>
+        <SellingStatusCodeEffectiveDate Offset="-05:00" L10nDate="03/20/2025 00:00:00">2025-03-20 00:00:00</SellingStatusCodeEffectiveDate>
+      </Sale>
+      <ExtensionData>
+        <entry>
+          <string>LEVEL</string>
+          <string>STORE</string>
+        </entry>
+        <entry>
+          <string>PARENT_MERCHANDISE_HIERARCHY_ID</string>
+          <string>800000007</string>
+        </entry>
+      </ExtensionData>
+      <TaxChannel>Omnistore</TaxChannel>
+      <DateTime Offset="-05:00" L10nDate="04/14/2025 15:58:01">2025-04-14 15:58:01</DateTime>
+      <CreatedDateTime Offset="-05:00" L10nDate="04/14/2025 15:58:01">2025-04-14 15:58:01</CreatedDateTime>
+      <OperatorID OperatorName="Leesa Schlimgen">LSCHLIMGEN</OperatorID>
+      <WorkstationID WorkstationNumber="4">216</WorkstationID>
+      <DeviceID>RT22069.dtcretail.local</DeviceID>
+      <PromotionAppliedFlag>true</PromotionAppliedFlag>
+      <DiscountCardApplicableFlag>false</DiscountCardApplicableFlag>
+      <PseudoLineItemSequence>1</PseudoLineItemSequence>
+    </LineItem>
+    <LineItem CancelFlag="false" Action="Add" EntryMethod="SCAN">
+      <SequenceNumber>2</SequenceNumber>
+      <Discount MethodCode="Coupon">
+        <DiscountID>VETFIRSTR5</DiscountID>
+        <ApplyDiscountCardOnPromotionFlag>true</ApplyDiscountCardOnPromotionFlag>
+      </Discount>
+      <CreatedDateTime Offset="-05:00" L10nDate="04/14/2025 15:58:04">2025-04-14 15:58:04</CreatedDateTime>
+      <PriceOverrideAppliedFlag>false</PriceOverrideAppliedFlag>
+    </LineItem>
+    <LineItem CancelFlag="false">
+      <SequenceNumber>3</SequenceNumber>
+      <Discount MethodCode="PROMOTIONS">
+        <Amount Currency="USD" L10nAmount="-$0.45">-0.45</Amount>
+        <PromotionID TypeCode="1">
+          <value>RTL5OFF</value>
+        </PromotionID>
+        <OperatorDisplayText>5% off No Min + Free Shipping</OperatorDisplayText>
+        <CustomerDisplayText>Coupon discount</CustomerDisplayText>
+        <ReceiptPrintText>5% off No Min + Free Shipping</ReceiptPrintText>
+        <TotalAmount Currency="USD" L10nAmount="-$0.45">-0.45</TotalAmount>
+        <ApplyDiscountCardOnPromotionFlag>false</ApplyDiscountCardOnPromotionFlag>
+      </Discount>
+      <CreatedDateTime Offset="-05:00" L10nDate="04/14/2025 15:58:04">2025-04-14 15:58:04</CreatedDateTime>
+    </LineItem>
+    <LineItem CancelFlag="false" EntryMethod="Inserted">
+      <SequenceNumber>4</SequenceNumber>
+      <Tender TenderType="CreditDebit" TypeCode="Sale">
+        <Amount Currency="USD" L10nAmount="$8.97">8.97</Amount>
+        <AmountAppliedToBill Currency="USD" L10nAmount="$8.97">8.97</AmountAppliedToBill>
+        <Authorization>
+          <RequestedAmount Currency="USD" L10nAmount="$8.97">8.97</RequestedAmount>
+          <AuthorizationCode>725401</AuthorizationCode>
+          <ReferenceNumber>138251046110824057</ReferenceNumber>
+          <AuthorizationDateTime Offset="-05:00" L10nDate="04/14/2025 15:58:29">2025-04-14 15:58:29</AuthorizationDateTime>
+          <CardHash>4XXXXXXXXXXX1838</CardHash>
+        </Authorization>
+        <CreditDebit>
+          <PanNumber>4XXXXXXXXXXX1838</PanNumber>
+        </CreditDebit>
+        <TenderStatus>Approved</TenderStatus>
+        <TenderDescription>Card</TenderDescription>
+      </Tender>
+      <ExtensionData class="linked-hash-map">
+        <entry>
+          <string>response</string>
+          <linked-hash-map>
+            <entry>
+              <string>posId</string>
+              <string>01</string>
+            </entry>
+            <entry>
+              <string>appId</string>
+              <string>01</string>
+            </entry>
+            <entry>
+              <string>cctId</string>
+              <string>01</string>
+            </entry>
+            <entry>
+              <string>transDetailsData</string>
+              <linked-hash-map>
+                <entry>
+                  <string>transDetailData</string>
+                  <linked-hash-map>
+                    <entry>
+                      <string>cardNumber</string>
+                      <string>4XXXXXXXXXXX1838</string>
+                    </entry>
+                    <entry>
+                      <string>CardIdentifier</string>
+                      <string>1000000005193903</string>
+                    </entry>
+                    <entry>
+                      <string>ProcessorToken</string>
+                      <string>414314XXXXXX1838</string>
+                    </entry>
+                    <entry>
+                      <string>ProcessorMerchantId</string>
+                      <string>222220212188</string>
+                    </entry>
+                    <entry>
+                      <string>DCCDetails</string>
+                      <linked-hash-map>
+                        <entry>
+                          <string>DCCMinorUnits</string>
+                          <string></string>
+                        </entry>
+                        <entry>
+                          <string>DCCMarginRatePercent</string>
+                          <string></string>
+                        </entry>
+                        <entry>
+                          <string>DCCAlphaCurrencyCode</string>
+                          <string></string>
+                        </entry>
+                        <entry>
+                          <string>DCCCurrencyName</string>
+                          <string></string>
+                        </entry>
+                        <entry>
+                          <string>DCCExchRateSrcName</string>
+                          <string></string>
+                        </entry>
+                        <entry>
+                          <string>DCCOffered</string>
+                          <string>0</string>
+                        </entry>
+                        <entry>
+                          <string>DCCExchangeRate</string>
+                          <string></string>
+                        </entry>
+                        <entry>
+                          <string>DCCResponseCode</string>
+                          <string></string>
+                        </entry>
+                        <entry>
+                          <string>DCCValidHours</string>
+                          <string></string>
+                        </entry>
+                        <entry>
+                          <string>DCCExchRateSrcTime</string>
+                          <string></string>
+                        </entry>
+                        <entry>
+                          <string>DCCFgnAmount</string>
+                          <string></string>
+                        </entry>
+                        <entry>
+                          <string>DCCCurrencyCode</string>
+                          <string></string>
+                        </entry>
+                      </linked-hash-map>
+                    </entry>
+                    <entry>
+                      <string>CardExpiryDate</string>
+                      <string>0526</string>
+                    </entry>
+                    <entry>
+                      <string>TransactionTypeCode</string>
+                      <string>21</string>
+                    </entry>
+                    <entry>
+                      <string>TransactionResponseText</string>
+                      <string>APPROVAL</string>
+                    </entry>
+                    <entry>
+                      <string>CardEntryMode</string>
+                      <string>I</string>
+                    </entry>
+                    <entry>
+                      <string>TipAmount</string>
+                      <string>0.00</string>
+                    </entry>
+                    <entry>
+                      <string>ReceiptToken</string>
+                      <string>4143141110051838</string>
+                    </entry>
+                    <entry>
+                      <string>SignatureReceiptFlag</string>
+                      <string>2</string>
+                    </entry>
+                    <entry>
+                      <string>ECOMMInfo</string>
+                      <linked-hash-map>
+                        <entry>
+                          <string>oneOrderToken</string>
+                          <string></string>
+                        </entry>
+                      </linked-hash-map>
+                    </entry>
+                    <entry>
+                      <string>LoyaltyInfo</string>
+                      <linked-hash-map/>
+                    </entry>
+                    <entry>
+                      <string>ProcessorResponseCode</string>
+                      <string>00</string>
+                    </entry>
+                    <entry>
+                      <string>EMVData</string>
+                      <string>[FS]MerchantID~222220212188[FS]TerminalID~[FS]ARC~00ISO~00[FS]AID~A0000000980840[FS]TVR~8000048000[FS]TSI~6C00[FS]IAD~06011203A08000[FS]App Pref Name~[FS]App Label~US DEBIT[FS]RespDate~04142025[FS]RespTime~155828</string>
+                    </entry>
+                    <entry>
+                      <string>VoidData</string>
+                      <string></string>
+                    </entry>
+                    <entry>
+                      <string>TotalApprovedAmount</string>
+                      <string>8.97</string>
+                    </entry>
+                    <entry>
+                      <string>EMVDataInTLVFormat</string>
+                      <string>AID%7EA0000000980840%1ETVR%7E8000048000%1EIAD%7E06011203A08000%1ETSI%7E6800%1EARC%7E3030</string>
+                    </entry>
+                    <entry>
+                      <string>TransactionSequenceNumber</string>
+                      <string>000020</string>
+                    </entry>
+                    <entry>
+                      <string>CardType</string>
+                      <string>VID</string>
+                    </entry>
+                    <entry>
+                      <string>TransactionIdentifier</string>
+                      <string>138251046110824057</string>
+                    </entry>
+                    <entry>
+                      <string>PartialApprovedFlag</string>
+                      <string>N</string>
+                    </entry>
+                    <entry>
+                      <string>FallbackIndicator</string>
+                      <string>0</string>
+                    </entry>
+                    <entry>
+                      <string>CustomerName</string>
+                      <string>CLARK JULIEANN</string>
+                    </entry>
+                    <entry>
+                      <string>AdditionalReceiptInfo</string>
+                      <linked-hash-map>
+                        <entry>
+                          <string>line</string>
+                          <list>
+                            <string>Amount:8.97</string>
+                            <string>Card:VISA DEBIT XXXX1838 EMV</string>
+                            <string>APPROVAL CODE:725401</string>
+                            <string>AID: A0000000980840</string>
+                            <string>TVR: 8000048000</string>
+                            <string>IAD: 06011203A08000</string>
+                            <string>TSI: 6C00</string>
+                            <string>APPLICATION CRYPTOGRAM:AABD38FEECB99510</string>
+                            <string>APPLICATION PREFERRED NAME:</string>
+                            <string>APPLICATION LABEL:US DEBIT</string>
+                          </list>
+                        </entry>
+                      </linked-hash-map>
+                    </entry>
+                    <entry>
+                      <string>ResponseCode</string>
+                      <string>00000</string>
+                    </entry>
+                    <entry>
+                      <string>BalanceAmount</string>
+                      <string>0.00</string>
+                    </entry>
+                    <entry>
+                      <string>EMVFlag</string>
+                      <string>1</string>
+                    </entry>
+                    <entry>
+                      <string>ApprovalCode</string>
+                      <string>725401</string>
+                    </entry>
+                    <entry>
+                      <string>TransactionAmount</string>
+                      <string>8.97</string>
+                    </entry>
+                    <entry>
+                      <string>eppDetailsInfo</string>
+                      <linked-hash-map>
+                        <entry>
+                          <string>sTAN</string>
+                          <string>00085595</string>
+                        </entry>
+                      </linked-hash-map>
+                    </entry>
+                  </linked-hash-map>
+                </entry>
+              </linked-hash-map>
+            </entry>
+            <entry>
+              <string>batchNumber</string>
+              <string>104001</string>
+            </entry>
+            <entry>
+              <string>aurusPayTicketNum</string>
+              <string>102510461108240839</string>
+            </entry>
+          </linked-hash-map>
+        </entry>
+      </ExtensionData>
+      <AuxiliaryData>
+        <AllocationData>
+          <AmountAppliedToOrder>0</AmountAppliedToOrder>
+          <AmountAppliedToTakeaway>8.97</AmountAppliedToTakeaway>
+        </AllocationData>
+      </AuxiliaryData>
+      <DateTime Offset="-05:00" L10nDate="04/14/2025 15:58:29">2025-04-14 15:58:29</DateTime>
+      <CreatedDateTime Offset="-05:00" L10nDate="04/14/2025 15:58:07">2025-04-14 15:58:07</CreatedDateTime>
+    </LineItem>
+    <Total TotalType="TransactionSavingsAmount" Currency="USD" L10nAmount="-$0.45">-0.45</Total>
+    <Total TotalType="TransactionNetAmount" Currency="USD" L10nAmount="$8.50">8.50</Total>
+    <Total TotalType="TotalDiscountAmount" Currency="USD" L10nAmount="$0.00">0.00</Total>
+    <Total TotalType="TransactionPromotionalSavingsAmount" Currency="USD" L10nAmount="-$0.45">-0.45</Total>
+    <Total TotalType="GrandTotalAmount" TypeCode="Payment" Currency="USD" L10nAmount="$8.97">8.97</Total>
+    <Total TotalType="TotalTaxCollected" TypeCode="EvenSale" Currency="USD" L10nAmount="$0.47">0.47</Total>
+    <Total TotalType="TotalEmployeeDiscountAmount" Currency="USD" L10nAmount="$0.00">0.00</Total>
+    <Total TotalType="ReturnTransactionDiscountAmount" TypeCode="Return" Currency="USD" L10nAmount="$0.00">0.00</Total>
+    <Total TotalType="GrandTotalAmountWithoutTax" TypeCode="Payment" Currency="USD" L10nAmount="$8.50">8.50</Total>
+    <Total TotalType="TransactionTaxExemptAmount" Currency="USD" L10nAmount="$0.00">0.00</Total>
+    <Total TotalType="SaleTransactionGrossAmountAfterPriceOverride" TypeCode="Sale" Currency="USD" L10nAmount="$8.95">8.95</Total>
+    <Total TotalType="TotalDiscountCardAmount" Currency="USD" L10nAmount="$0.00">0.00</Total>
+    <Total TotalType="TransactionGrossAmount" Currency="USD" L10nAmount="$8.95">8.95</Total>
+    <Total TotalType="TransactionGrossAmountAfterPriceOverride" Currency="USD" L10nAmount="$8.95">8.95</Total>
+    <Total TotalType="TotalLoyaltyVoucherAmount" Currency="USD" L10nAmount="$0.00">0.00</Total>
+    <Total TotalType="TotalManualTransactionDiscountAmount" TypeCode="Sale" Currency="USD" L10nAmount="$0.00">0.00</Total>
+    <Total TotalType="SalesTransactionDiscountAmount" TypeCode="Sale" Currency="USD" L10nAmount="$0.00">0.00</Total>
+    <Total TotalType="TransactionTaxAmount" TypeCode="Sale" Currency="USD" L10nAmount="$0.47">0.47</Total>
+    <Total TotalType="TransactionGrandAmount" TypeCode="Sale" Currency="USD" L10nAmount="$8.97">8.97</Total>
+    <Total TotalType="TransactionBalanceDue" Currency="USD" L10nAmount="$0.00">0.00</Total>
+    <Total TotalType="TransactionRefundTenderedAmount" TypeCode="Return" Currency="USD" L10nAmount="$0.00">0.00</Total>
+    <Total TotalType="TransactionTenderApplied" Currency="USD" L10nAmount="$8.97">8.97</Total>
+    <Total TotalType="TransactionCardTenderedAmount" Currency="USD" L10nAmount="$8.97">8.97</Total>
+    <Customer>
+      <CustomerID>228227690</CustomerID>
+      <CustomerStatus>Active</CustomerStatus>
+      <AccountType>RETAIL</AccountType>
+      <Name FirstName="Julie" LastName="Clark">
+        <OfficialName></OfficialName>
+      </Name>
+      <Address>
+        <AddressLine1>3912 Harrogate Dr</AddressLine1>
+        <AddressLine2></AddressLine2>
+        <AddressId>Omnistore</AddressId>
+        <City>NORMAN</City>
+        <Territory>OK</Territory>
+        <PostalCode>73072</PostalCode>
+        <Country>USA</Country>
+      </Address>
+      <Home>
+        <LocalNumber></LocalNumber>
+      </Home>
+      <Mobile>
+        <LocalNumber>405-694-6116</LocalNumber>
+      </Mobile>
+      <Office>
+        <LocalNumber></LocalNumber>
+      </Office>
+      <EMail>
+        <EMailAddress>juleswc@ou.edu</EMailAddress>
+      </EMail>
+      <PhoneOptIn>false</PhoneOptIn>
+      <EmailOptIn>false</EmailOptIn>
+      <AddressOptIn>false</AddressOptIn>
+      <IrnOptIn>false</IrnOptIn>
+      <ConsentFlag>false</ConsentFlag>
+      <BeginDateTime Offset="-05:00" L10nDate="04/14/2025 15:57:58">2025-04-14 15:57:58</BeginDateTime>
+      <Gender></Gender>
+      <BrandName></BrandName>
+      <TagMode>TagWithInfo</TagMode>
+    </Customer>
+    <TransactionDiscountApplied>false</TransactionDiscountApplied>
+    <EmployeeDiscountApplied>false</EmployeeDiscountApplied>
+    <TransactionPromotionApplied>true</TransactionPromotionApplied>
+    <DiscountCardApplied>false</DiscountCardApplied>
+    <UniqueItemCount>1</UniqueItemCount>
+    <ReturnItemCount>0</ReturnItemCount>
+    <TotalItemCount>2</TotalItemCount>
+    <TaxSummary>
+      <TaxSummaryGroup TaxType="ST">
+        <TaxGroupID Name="">2930450</TaxGroupID>
+        <ProductTaxClassificationCode>800000007</ProductTaxClassificationCode>
+        <Amount Currency="USD" L10nAmount="$0.43">
+          <value>0.43</value>
+        </Amount>
+        <TaxableAmountWithoutTax Currency="USD" L10nAmount="$8.50">
+          <value>8.50</value>
+        </TaxableAmountWithoutTax>
+        <TaxableAmount Currency="USD" L10nAmount="$8.50">
+          <value>8.50</value>
+        </TaxableAmount>
+        <Percent>5.0000</Percent>
+        <TaxRateRuleID>1</TaxRateRuleID>
+      </TaxSummaryGroup>
+      <TaxSummaryGroup TaxType="ST">
+        <TaxGroupID Name="">2933005</TaxGroupID>
+        <ProductTaxClassificationCode>800000007</ProductTaxClassificationCode>
+        <Amount Currency="USD" L10nAmount="$0.04">
+          <value>0.04</value>
+        </Amount>
+        <TaxableAmountWithoutTax Currency="USD" L10nAmount="$8.50">
+          <value>8.50</value>
+        </TaxableAmountWithoutTax>
+        <TaxableAmount Currency="USD" L10nAmount="$8.50">
+          <value>8.50</value>
+        </TaxableAmount>
+        <Percent>0.5000</Percent>
+        <TaxRateRuleID>1</TaxRateRuleID>
+      </TaxSummaryGroup>
+    </TaxSummary>
+    <MixedBasketFlag>false</MixedBasketFlag>
+    <PartialPaymentFlag>false</PartialPaymentFlag>
+    <PartialRefundFlag>false</PartialRefundFlag>
+    <GiftCardSaleFlag>false</GiftCardSaleFlag>
+    <PedMode>restricted</PedMode>
+    <AgeRestrictionByPassByCashier>false</AgeRestrictionByPassByCashier>
+    <SalesRestrictionTypeCodeList/>
+    <MinimumPurchaserAge>0</MinimumPurchaserAge>
+    <AgeRestrictedItemDeclinedByCashier>false</AgeRestrictedItemDeclinedByCashier>
+    <TenderManagerApproval>false</TenderManagerApproval>
+    <PromotionSavingsSummary>
+      <TotalSavings Currency="USD" L10nAmount="-$0.45">-0.45</TotalSavings>
+      <Savings>
+        <PromotionID>RTL5OFF</PromotionID>
+        <PromotionType>TXN</PromotionType>
+        <PromotionSavings Currency="USD" L10nAmount="-$0.45">-0.45</PromotionSavings>
+        <OrderAppliedSequenceNumber>1</OrderAppliedSequenceNumber>
+        <OperatorDisplayText>5% off No Min + Free Shipping</OperatorDisplayText>
+        <CustomerDisplayText>Coupon discount</CustomerDisplayText>
+        <ReceiptPrintText>5% off No Min + Free Shipping</ReceiptPrintText>
+        <NumberOfTimesPromotionApplied>0</NumberOfTimesPromotionApplied>
+        <CustomerActivatedPromotion>false</CustomerActivatedPromotion>
+      </Savings>
+    </PromotionSavingsSummary>
+  </CustomerOrderTransaction>
+  <ExtensionData>
+    <entry>
+      <string>MajorVersion</string>
+      <string>3.0</string>
+    </entry>
+    <entry>
+      <string>MinorVersion</string>
+      <string>3.10</string>
+    </entry>
+    <entry>
+      <string>ORDER_OUTSTANDING_TOTALS_AMOUNT</string>
+      <big-decimal>0</big-decimal>
+    </entry>
+  </ExtensionData>
+  <TimeZone>CDT</TimeZone>
+  <AuxiliaryData>
+    <Totals>
+      <DeliveryTotalAmount>0</DeliveryTotalAmount>
+      <InStorePickupTotalAmount>0</InStorePickupTotalAmount>
+      <TakeawayTotalAmount>8.97</TakeawayTotalAmount>
+      <TakeawayTotalTaxAmount>0.47</TakeawayTotalTaxAmount>
+      <DeliveryTotalTaxAmount>0</DeliveryTotalTaxAmount>
+      <InStorePickupTotalTaxAmount>0</InStorePickupTotalTaxAmount>
+      <OrderTotalAmount>0</OrderTotalAmount>
+      <OrderTotalTaxAmount>0</OrderTotalTaxAmount>
+    </Totals>
+    <SoftwareDetails>
+      <Software/>
+      <Software/>
+      <Software/>
+      <Software/>
+      <Software/>
+      <Software/>
+      <Software/>
+      <Software/>
+    </SoftwareDetails>
+  </AuxiliaryData>
+  <SupplementaryData/>
+  <TillID>12</TillID>
+  <BusinessDayDate>2025-04-14 00:00:00</BusinessDayDate>
+  <BeginDateTime Offset="-05:00" L10nDate="04/14/2025 15:57:58">2025-04-14 15:57:58</BeginDateTime>
+  <EndDateTime Offset="-05:00" L10nDate="04/14/2025 15:58:32">2025-04-14 15:58:32</EndDateTime>
+  <RefundExpiryDate Offset="-05:00" L10nDate="04/14/2026 23:59:59">2026-04-14 23:59:59</RefundExpiryDate>
+  <EJTransactionIndicators>
+    <TrnPromoAppliedflag>Y</TrnPromoAppliedflag>
+    <CustomerTaggedFlag>Y</CustomerTaggedFlag>
+    <CardSwipeAutoFlag>Y</CardSwipeAutoFlag>
+    <TenderCreditFlag>Y</TenderCreditFlag>
+    <TaxInfoIncludedFlag>Y</TaxInfoIncludedFlag>
+    <SaleTransactionFlag>Y</SaleTransactionFlag>
+  </EJTransactionIndicators>
+  <EncReferenceID>19</EncReferenceID>
+  <TransactionLink Typecode="PreviousTransaction">
+    <TransactionID>RT0012161404250325</TransactionID>
+    <BusinessUnit>
+      <value>1</value>
+    </BusinessUnit>
+    <WorkstationID>
+      <value>216</value>
+    </WorkstationID>
+    <Signature>493118AB619AA2762B333F122BBD06D6572F6C6AF069BD4F2E4E4811A76E207C</Signature>
+  </TransactionLink>
+</com.tcs.retail.store.poslog.TransactionDomainSpecific>

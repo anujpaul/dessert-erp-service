@@ -239,7 +239,17 @@ public class BatchJobService : IBatchJobService
                     var result = await _retailStatements.ImportPosLogAsync(
                         config.OrganizationId, retailXml, fileName, ct);
                     totalFiles++;
-                    if (!result.Duplicate) totalPromoted++;
+                    if (result.TransactionId is not null)
+                    {
+                        if (!result.Duplicate) totalPromoted++;
+                    }
+                    else
+                    {
+                        totalFailed++;
+                        throw new InvalidOperationException(
+                            result.ValidationMessage ??
+                            $"Retail transaction {result.TransactionNumber} failed staging validation.");
+                    }
                 }
                 else
                 {

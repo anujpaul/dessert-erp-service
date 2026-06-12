@@ -105,6 +105,9 @@ public interface IAppDbContext
     DbSet<POSPayment>         POSPayments         { get; }
     DbSet<RetailStatement>    RetailStatements    { get; }
     DbSet<RetailTenderSettlement> RetailTenderSettlements { get; }
+    DbSet<RetailTransactionStaging> RetailTransactionStaging { get; }
+    DbSet<RetailTransactionStagingLine> RetailTransactionStagingLines { get; }
+    DbSet<RetailTransactionStagingTender> RetailTransactionStagingTenders { get; }
     DbSet<Promotion>          Promotions          { get; }
     DbSet<Coupon>             Coupons             { get; }
     DbSet<CouponRedemption>   CouponRedemptions   { get; }

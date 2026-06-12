@@ -11,6 +11,10 @@ public interface IWarehouseManagementService
     Task<WarehouseDto?>             UpdateWarehouseAsync(Guid id, UpdateWarehouseDto dto);
     Task<bool>                      ActivateWarehouseAsync(Guid id);
     Task<bool>                      DeactivateWarehouseAsync(Guid id);
+    Task<List<WarehouseTypeDto>>    GetWarehouseTypesAsync();
+    Task<WarehouseTypeDto>          CreateWarehouseTypeAsync(CreateWarehouseTypeDto dto);
+    Task<List<OperationalSiteDto>>  GetSitesAsync();
+    Task<OperationalSiteDto>        CreateSiteAsync(CreateOperationalSiteDto dto);
 
     // ── Locations ────────────────────────────────────────────────
     Task<List<WarehouseLocationDto>> GetLocationsAsync(Guid warehouseId);

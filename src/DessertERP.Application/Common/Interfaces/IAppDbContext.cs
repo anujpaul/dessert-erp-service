@@ -40,6 +40,8 @@ public interface IAppDbContext
     DbSet<InventoryRecord>      InventoryRecords      { get; }
     DbSet<InventoryTransaction> InventoryTransactions { get; }
     DbSet<Warehouse> Warehouses { get; }
+    DbSet<WarehouseType> WarehouseTypes { get; }
+    DbSet<OperationalSite> OperationalSites { get; }
     DbSet<WarehouseLocation> WarehouseLocations { get; }
     DbSet<WarehouseInventoryBalance> WarehouseInventoryBalances { get; }
 

@@ -52,6 +52,30 @@ public class WarehouseManagementController : ControllerBase
     public async Task<IActionResult> Deactivate(Guid id) =>
         await _svc.DeactivateWarehouseAsync(id) ? Ok() : NotFound();
 
+    [HttpGet("types")]
+    public async Task<IActionResult> GetWarehouseTypes() =>
+        Ok(await _svc.GetWarehouseTypesAsync());
+
+    [HttpPost("types")]
+    [Authorize(Policy = PermissionKeys.WarehouseManage)]
+    public async Task<IActionResult> CreateWarehouseType([FromBody] CreateWarehouseTypeDto dto)
+    {
+        try { return StatusCode(201, await _svc.CreateWarehouseTypeAsync(dto)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpGet("sites")]
+    public async Task<IActionResult> GetSites() =>
+        Ok(await _svc.GetSitesAsync());
+
+    [HttpPost("sites")]
+    [Authorize(Policy = PermissionKeys.WarehouseManage)]
+    public async Task<IActionResult> CreateSite([FromBody] CreateOperationalSiteDto dto)
+    {
+        try { return StatusCode(201, await _svc.CreateSiteAsync(dto)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
     // ── Locations ────────────────────────────────────────────────────────────
 
     [HttpGet("{warehouseId:guid}/locations")]

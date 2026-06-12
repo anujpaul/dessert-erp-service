@@ -23,6 +23,8 @@ public class WarehouseManagementService : IWarehouseManagementService
 
     public async Task<List<WarehouseDto>> GetWarehousesAsync() =>
         await _db.Warehouses
+            .Include(w => w.WarehouseType)
+            .Include(w => w.Site)
             .Where(w => w.OrganizationId == _org.OrganizationId)
             .OrderBy(w => w.Code)
             .Select(w => ToWarehouseDto(w))
@@ -30,17 +32,24 @@ public class WarehouseManagementService : IWarehouseManagementService
 
     public async Task<WarehouseDto?> GetWarehouseAsync(Guid id)
     {
-        var w = await _db.Warehouses.Include(x => x.Locations)
+        var w = await _db.Warehouses
+            .Include(x => x.Locations)
+            .Include(x => x.WarehouseType)
+            .Include(x => x.Site)
             .FirstOrDefaultAsync(x => x.Id == id);
         return w is null ? null : ToWarehouseDto(w);
     }
 
     public async Task<WarehouseDto> CreateWarehouseAsync(CreateWarehouseDto dto)
     {
+        await ValidateWarehouseMasterData(dto.WarehouseTypeId, dto.SiteId);
         var warehouse = new Warehouse(_org.OrganizationId, dto.Code, dto.Name,
-            dto.Address, dto.City, dto.Country, dto.IsDefault);
+            dto.Address, dto.City, dto.Country, dto.IsDefault,
+            dto.WarehouseTypeId, dto.SiteId);
         _db.Warehouses.Add(warehouse);
         await _db.SaveChangesAsync();
+        await _db.Entry(warehouse).Reference(w => w.WarehouseType).LoadAsync();
+        await _db.Entry(warehouse).Reference(w => w.Site).LoadAsync();
         return ToWarehouseDto(warehouse);
     }
 
@@ -48,9 +57,75 @@ public class WarehouseManagementService : IWarehouseManagementService
     {
         var warehouse = await _db.Warehouses.FindAsync(id);
         if (warehouse is null) return null;
-        warehouse.Update(dto.Name, dto.Address, dto.City, dto.Country);
+        await ValidateWarehouseMasterData(dto.WarehouseTypeId, dto.SiteId);
+        warehouse.Update(dto.Name, dto.Address, dto.City, dto.Country,
+            dto.WarehouseTypeId, dto.SiteId);
         await _db.SaveChangesAsync();
+        await _db.Entry(warehouse).Reference(w => w.WarehouseType).LoadAsync();
+        await _db.Entry(warehouse).Reference(w => w.Site).LoadAsync();
         return ToWarehouseDto(warehouse);
+    }
+
+    public async Task<List<WarehouseTypeDto>> GetWarehouseTypesAsync()
+    {
+        var types = await _db.WarehouseTypes
+            .Where(t => t.OrganizationId == _org.OrganizationId && t.IsActive)
+            .OrderBy(t => t.Name)
+            .ToListAsync();
+        if (types.Count == 0)
+        {
+            types =
+            [
+                new WarehouseType(_org.OrganizationId, "Distribution Center"),
+                new WarehouseType(_org.OrganizationId, "Fulfillment Center"),
+                new WarehouseType(_org.OrganizationId, "Retail Backroom"),
+                new WarehouseType(_org.OrganizationId, "Return Center")
+            ];
+            _db.WarehouseTypes.AddRange(types);
+            await _db.SaveChangesAsync();
+        }
+        return types.Select(ToWarehouseTypeDto).ToList();
+    }
+
+    public async Task<WarehouseTypeDto> CreateWarehouseTypeAsync(CreateWarehouseTypeDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Name))
+            throw new InvalidOperationException("Warehouse type name is required.");
+        var exists = await _db.WarehouseTypes.AnyAsync(t =>
+            t.OrganizationId == _org.OrganizationId && t.Name.ToLower() == dto.Name.Trim().ToLower());
+        if (exists)
+            throw new InvalidOperationException("A warehouse type with this name already exists.");
+        var type = new WarehouseType(_org.OrganizationId, dto.Name, dto.Description);
+        _db.WarehouseTypes.Add(type);
+        await _db.SaveChangesAsync();
+        return ToWarehouseTypeDto(type);
+    }
+
+    public async Task<List<OperationalSiteDto>> GetSitesAsync() =>
+        (await _db.OperationalSites
+            .Where(s => s.OrganizationId == _org.OrganizationId && s.IsActive)
+            .OrderBy(s => s.Code)
+            .ToListAsync())
+        .Select(ToSiteDto).ToList();
+
+    public async Task<OperationalSiteDto> CreateSiteAsync(CreateOperationalSiteDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Code) || string.IsNullOrWhiteSpace(dto.Name))
+            throw new InvalidOperationException("Site code and name are required.");
+        if (!dto.IsRetailStore && !dto.IsFulfillmentCenter &&
+            !dto.IsReturnCenter && !dto.IsWarehouse)
+            throw new InvalidOperationException("Select at least one site capability.");
+        var exists = await _db.OperationalSites.AnyAsync(s =>
+            s.OrganizationId == _org.OrganizationId &&
+            s.Code == dto.Code.Trim().ToUpper());
+        if (exists)
+            throw new InvalidOperationException("A site with this code already exists.");
+        var site = new OperationalSite(_org.OrganizationId, dto.Code, dto.Name,
+            dto.Address, dto.City, dto.Country, dto.IsRetailStore,
+            dto.IsFulfillmentCenter, dto.IsReturnCenter, dto.IsWarehouse);
+        _db.OperationalSites.Add(site);
+        await _db.SaveChangesAsync();
+        return ToSiteDto(site);
     }
 
     public async Task<bool> ActivateWarehouseAsync(Guid id)
@@ -404,11 +479,40 @@ public class WarehouseManagementService : IWarehouseManagementService
             throw new InvalidOperationException("The selected warehouse location is not receivable.");
     }
 
+    private async Task ValidateWarehouseMasterData(Guid? warehouseTypeId, Guid? siteId)
+    {
+        if (warehouseTypeId.HasValue && !await _db.WarehouseTypes.AnyAsync(t =>
+                t.Id == warehouseTypeId && t.OrganizationId == _org.OrganizationId && t.IsActive))
+            throw new InvalidOperationException("The selected warehouse type is invalid or inactive.");
+        if (siteId.HasValue && !await _db.OperationalSites.AnyAsync(s =>
+                s.Id == siteId && s.OrganizationId == _org.OrganizationId && s.IsActive))
+            throw new InvalidOperationException("The selected site is invalid or inactive.");
+    }
+
     // ── Mapping helpers ─────────────────────────────────────────────────────
 
     private static WarehouseDto ToWarehouseDto(Warehouse w) => new(
         w.Id, w.OrganizationId, w.Code, w.Name, w.Address, w.City, w.Country,
+        w.WarehouseTypeId, w.WarehouseType?.Name, w.SiteId, w.Site?.Name,
+        w.Site is null ? null : SiteCapabilities(w.Site),
         w.IsActive, w.IsDefault, w.Locations.Count);
+
+    private static WarehouseTypeDto ToWarehouseTypeDto(WarehouseType type) =>
+        new(type.Id, type.Name, type.Description, type.IsActive);
+
+    private static OperationalSiteDto ToSiteDto(OperationalSite site) =>
+        new(site.Id, site.Code, site.Name, site.Address, site.City, site.Country,
+            site.IsRetailStore, site.IsFulfillmentCenter, site.IsReturnCenter,
+            site.IsWarehouse, site.IsActive, SiteCapabilities(site));
+
+    private static string SiteCapabilities(OperationalSite site) =>
+        string.Join(", ", new[]
+        {
+            site.IsRetailStore ? "Retail Store" : null,
+            site.IsFulfillmentCenter ? "Fulfillment Center" : null,
+            site.IsReturnCenter ? "Return Center" : null,
+            site.IsWarehouse ? "Warehouse" : null
+        }.Where(value => value is not null));
 
     private static WarehouseLocationDto ToLocationDto(WarehouseLocation l) => new(
         l.Id, l.WarehouseId, l.Code, l.Zone, l.Aisle, l.Bay, l.Level, l.Bin,

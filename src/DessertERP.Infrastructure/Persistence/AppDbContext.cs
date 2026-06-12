@@ -135,6 +135,8 @@ public class AppDbContext : DbContext, IAppDbContext
 
     // Warehouse Management
     public DbSet<Warehouse>         Warehouses         => Set<Warehouse>();
+    public DbSet<WarehouseType>     WarehouseTypes     => Set<WarehouseType>();
+    public DbSet<OperationalSite>   OperationalSites   => Set<OperationalSite>();
     public DbSet<WarehouseLocation> WarehouseLocations => Set<WarehouseLocation>();
     public DbSet<InboundOrder>      InboundOrders      => Set<InboundOrder>();
     public DbSet<InboundOrderLine>  InboundOrderLines  => Set<InboundOrderLine>();
@@ -310,6 +312,10 @@ public class AppDbContext : DbContext, IAppDbContext
         // Warehouse Management — org-scoped (no soft-delete on warehouse entities)
         modelBuilder.Entity<Warehouse>()
             .HasQueryFilter(e => _orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId);
+        modelBuilder.Entity<WarehouseType>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
+        modelBuilder.Entity<OperationalSite>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<InboundOrder>()
             .HasQueryFilter(e => _orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId);
         modelBuilder.Entity<OutboundOrder>()

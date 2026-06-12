@@ -8,6 +8,11 @@ public record WarehouseDto(
     string? Address,
     string? City,
     string? Country,
+    Guid?   WarehouseTypeId,
+    string? WarehouseTypeName,
+    Guid?   SiteId,
+    string? SiteName,
+    string? SiteCapabilities,
     bool    IsActive,
     bool    IsDefault,
     int     LocationCount
@@ -19,15 +24,32 @@ public record CreateWarehouseDto(
     string? Address,
     string? City,
     string? Country,
-    bool    IsDefault = false
+    bool    IsDefault = false,
+    Guid?   WarehouseTypeId = null,
+    Guid?   SiteId = null
 );
 
 public record UpdateWarehouseDto(
     string  Name,
     string? Address,
     string? City,
-    string? Country
+    string? Country,
+    Guid?   WarehouseTypeId = null,
+    Guid?   SiteId = null
 );
+
+public record WarehouseTypeDto(Guid Id, string Name, string? Description, bool IsActive);
+public record CreateWarehouseTypeDto(string Name, string? Description = null);
+
+public record OperationalSiteDto(
+    Guid Id, string Code, string Name, string? Address, string? City, string? Country,
+    bool IsRetailStore, bool IsFulfillmentCenter, bool IsReturnCenter,
+    bool IsWarehouse, bool IsActive, string Capabilities);
+
+public record CreateOperationalSiteDto(
+    string Code, string Name, string? Address, string? City, string? Country,
+    bool IsRetailStore = false, bool IsFulfillmentCenter = false,
+    bool IsReturnCenter = false, bool IsWarehouse = true);
 
 // ───── Location ─────
 

@@ -10,6 +10,10 @@ public class Warehouse : BaseEntity
     public string? Address       { get; private set; }
     public string? City          { get; private set; }
     public string? Country       { get; private set; }
+    public Guid?  WarehouseTypeId { get; private set; }
+    public WarehouseType? WarehouseType { get; private set; }
+    public Guid?  SiteId         { get; private set; }
+    public OperationalSite? Site { get; private set; }
     public bool   IsActive       { get; private set; } = true;
     public bool   IsDefault      { get; private set; }
 
@@ -19,7 +23,7 @@ public class Warehouse : BaseEntity
 
     public Warehouse(Guid organizationId, string code, string name,
         string? address = null, string? city = null, string? country = null,
-        bool isDefault = false)
+        bool isDefault = false, Guid? warehouseTypeId = null, Guid? siteId = null)
     {
         OrganizationId = organizationId;
         Code      = code.Trim().ToUpper();
@@ -28,14 +32,19 @@ public class Warehouse : BaseEntity
         City      = city;
         Country   = country;
         IsDefault = isDefault;
+        WarehouseTypeId = warehouseTypeId;
+        SiteId = siteId;
     }
 
-    public void Update(string name, string? address, string? city, string? country)
+    public void Update(string name, string? address, string? city, string? country,
+        Guid? warehouseTypeId, Guid? siteId)
     {
         Name    = name.Trim();
         Address = address;
         City    = city;
         Country = country;
+        WarehouseTypeId = warehouseTypeId;
+        SiteId = siteId;
         SetUpdated();
     }
 

@@ -15,6 +15,10 @@ public class WarehouseConfiguration : IEntityTypeConfiguration<Warehouse>
         b.Property(e => e.Address).HasMaxLength(500);
         b.Property(e => e.City).HasMaxLength(100);
         b.Property(e => e.Country).HasMaxLength(100);
+        b.HasOne(e => e.WarehouseType).WithMany()
+            .HasForeignKey(e => e.WarehouseTypeId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(e => e.Site).WithMany()
+            .HasForeignKey(e => e.SiteId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(e => new { e.OrganizationId, e.Code }).IsUnique();
         b.HasMany(e => e.Locations)
          .WithOne(l => l.Warehouse)
@@ -36,6 +40,33 @@ public class WarehouseLocationConfiguration : IEntityTypeConfiguration<Warehouse
         b.Property(e => e.Level).HasMaxLength(20);
         b.Property(e => e.Bin).HasMaxLength(20);
         b.HasIndex(e => new { e.WarehouseId, e.Code }).IsUnique();
+    }
+}
+
+public class WarehouseTypeConfiguration : IEntityTypeConfiguration<WarehouseType>
+{
+    public void Configure(EntityTypeBuilder<WarehouseType> b)
+    {
+        b.ToTable("WarehouseTypes");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.Name).IsRequired().HasMaxLength(100);
+        b.Property(e => e.Description).HasMaxLength(500);
+        b.HasIndex(e => new { e.OrganizationId, e.Name }).IsUnique();
+    }
+}
+
+public class OperationalSiteConfiguration : IEntityTypeConfiguration<OperationalSite>
+{
+    public void Configure(EntityTypeBuilder<OperationalSite> b)
+    {
+        b.ToTable("OperationalSites");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.Code).IsRequired().HasMaxLength(30);
+        b.Property(e => e.Name).IsRequired().HasMaxLength(200);
+        b.Property(e => e.Address).HasMaxLength(500);
+        b.Property(e => e.City).HasMaxLength(100);
+        b.Property(e => e.Country).HasMaxLength(100);
+        b.HasIndex(e => new { e.OrganizationId, e.Code }).IsUnique();
     }
 }
 

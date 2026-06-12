@@ -18,9 +18,30 @@ public class GeneralLedgerController : ControllerBase
 
     // ── Fiscal Calendar ───────────────────────────────────────────────────────
 
+    [HttpGet("fiscal-calendars")]
+    public async Task<IActionResult> GetFiscalCalendars(CancellationToken ct)
+        => Ok(await _svc.GetFiscalCalendarsAsync(ct));
+
+    [HttpPost("fiscal-calendars")]
+    public async Task<IActionResult> CreateFiscalCalendar(
+        [FromBody] CreateFiscalCalendarRequest req,
+        CancellationToken ct)
+    {
+        try { return StatusCode(201, await _svc.CreateFiscalCalendarAsync(req, ct)); }
+        catch (ArgumentException ex) { return BadRequest(new { error = ex.Message }); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPost("fiscal-calendars/{id:guid}/set-default")]
+    public async Task<IActionResult> SetDefaultFiscalCalendar(Guid id, CancellationToken ct)
+    {
+        try { await _svc.SetDefaultFiscalCalendarAsync(id, ct); return NoContent(); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
     [HttpGet("fiscal-years")]
-    public async Task<IActionResult> GetFiscalYears(CancellationToken ct)
-        => Ok(await _svc.GetFiscalYearsAsync(ct));
+    public async Task<IActionResult> GetFiscalYears([FromQuery] Guid? fiscalCalendarId, CancellationToken ct)
+        => Ok(await _svc.GetFiscalYearsAsync(fiscalCalendarId, ct));
 
     [HttpGet("fiscal-years/{id:guid}")]
     public async Task<IActionResult> GetFiscalYear(Guid id, CancellationToken ct)
@@ -31,7 +52,11 @@ public class GeneralLedgerController : ControllerBase
 
     [HttpPost("fiscal-years")]
     public async Task<IActionResult> CreateFiscalYear([FromBody] CreateFiscalYearRequest req, CancellationToken ct)
-        => StatusCode(201, await _svc.CreateFiscalYearAsync(req, ct));
+    {
+        try { return StatusCode(201, await _svc.CreateFiscalYearAsync(req, ct)); }
+        catch (ArgumentException ex) { return BadRequest(new { error = ex.Message }); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
 
     [HttpPost("fiscal-years/{id:guid}/close")]
     public async Task<IActionResult> CloseFiscalYear(Guid id, CancellationToken ct)

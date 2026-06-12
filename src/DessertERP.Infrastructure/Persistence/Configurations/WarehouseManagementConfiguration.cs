@@ -8,7 +8,7 @@ public class WarehouseConfiguration : IEntityTypeConfiguration<Warehouse>
 {
     public void Configure(EntityTypeBuilder<Warehouse> b)
     {
-        b.ToTable("Warehouses");
+        b.ToTable("warehouses");
         b.HasKey(e => e.Id);
         b.Property(e => e.Code).IsRequired().HasMaxLength(20);
         b.Property(e => e.Name).IsRequired().HasMaxLength(200);
@@ -31,7 +31,7 @@ public class WarehouseLocationConfiguration : IEntityTypeConfiguration<Warehouse
 {
     public void Configure(EntityTypeBuilder<WarehouseLocation> b)
     {
-        b.ToTable("WarehouseLocations");
+        b.ToTable("warehouse_locations");
         b.HasKey(e => e.Id);
         b.Property(e => e.Code).IsRequired().HasMaxLength(50);
         b.Property(e => e.Zone).HasMaxLength(50);
@@ -47,7 +47,7 @@ public class WarehouseTypeConfiguration : IEntityTypeConfiguration<WarehouseType
 {
     public void Configure(EntityTypeBuilder<WarehouseType> b)
     {
-        b.ToTable("WarehouseTypes");
+        b.ToTable("warehouse_types");
         b.HasKey(e => e.Id);
         b.Property(e => e.Name).IsRequired().HasMaxLength(100);
         b.Property(e => e.Description).HasMaxLength(500);
@@ -59,7 +59,7 @@ public class OperationalSiteConfiguration : IEntityTypeConfiguration<Operational
 {
     public void Configure(EntityTypeBuilder<OperationalSite> b)
     {
-        b.ToTable("OperationalSites");
+        b.ToTable("operational_sites");
         b.HasKey(e => e.Id);
         b.Property(e => e.Code).IsRequired().HasMaxLength(30);
         b.Property(e => e.Name).IsRequired().HasMaxLength(200);
@@ -74,7 +74,7 @@ public class WarehouseInventoryBalanceConfiguration : IEntityTypeConfiguration<W
 {
     public void Configure(EntityTypeBuilder<WarehouseInventoryBalance> b)
     {
-        b.ToTable("WarehouseInventoryBalances");
+        b.ToTable("warehouse_inventory_balances");
         b.HasKey(e => e.Id);
         b.Property(e => e.QuantityOnHand).HasColumnType("decimal(18,4)");
         b.Property(e => e.QuantityReserved).HasColumnType("decimal(18,4)");
@@ -105,7 +105,7 @@ public class InboundOrderConfiguration : IEntityTypeConfiguration<InboundOrder>
 {
     public void Configure(EntityTypeBuilder<InboundOrder> b)
     {
-        b.ToTable("InboundOrders");
+        b.ToTable("inbound_orders");
         b.HasKey(e => e.Id);
         b.Property(e => e.OrderNumber).IsRequired().HasMaxLength(50);
         b.Property(e => e.VendorName).HasMaxLength(200);
@@ -123,7 +123,7 @@ public class InboundOrderLineConfiguration : IEntityTypeConfiguration<InboundOrd
 {
     public void Configure(EntityTypeBuilder<InboundOrderLine> b)
     {
-        b.ToTable("InboundOrderLines");
+        b.ToTable("inbound_order_lines");
         b.HasKey(e => e.Id);
         b.Property(e => e.ProductName).IsRequired().HasMaxLength(200);
         b.Property(e => e.ProductSku).HasMaxLength(100);
@@ -139,7 +139,7 @@ public class OutboundOrderConfiguration : IEntityTypeConfiguration<OutboundOrder
 {
     public void Configure(EntityTypeBuilder<OutboundOrder> b)
     {
-        b.ToTable("OutboundOrders");
+        b.ToTable("outbound_orders");
         b.HasKey(e => e.Id);
         b.Property(e => e.OrderNumber).IsRequired().HasMaxLength(50);
         b.Property(e => e.CustomerName).HasMaxLength(200);
@@ -160,7 +160,7 @@ public class OutboundOrderLineConfiguration : IEntityTypeConfiguration<OutboundO
 {
     public void Configure(EntityTypeBuilder<OutboundOrderLine> b)
     {
-        b.ToTable("OutboundOrderLines");
+        b.ToTable("outbound_order_lines");
         b.HasKey(e => e.Id);
         b.Property(e => e.ProductName).IsRequired().HasMaxLength(200);
         b.Property(e => e.ProductSku).HasMaxLength(100);
@@ -177,7 +177,7 @@ public class TransferOrderConfiguration : IEntityTypeConfiguration<TransferOrder
 {
     public void Configure(EntityTypeBuilder<TransferOrder> b)
     {
-        b.ToTable("TransferOrders");
+        b.ToTable("transfer_orders");
         b.HasKey(e => e.Id);
         b.Property(e => e.OrderNumber).IsRequired().HasMaxLength(50);
         b.Property(e => e.Notes).HasMaxLength(1000);
@@ -202,7 +202,7 @@ public class TransferOrderLineConfiguration : IEntityTypeConfiguration<TransferO
 {
     public void Configure(EntityTypeBuilder<TransferOrderLine> b)
     {
-        b.ToTable("TransferOrderLines");
+        b.ToTable("transfer_order_lines");
         b.HasKey(e => e.Id);
         b.Property(e => e.ProductName).IsRequired().HasMaxLength(200);
         b.Property(e => e.ProductSku).HasMaxLength(100);

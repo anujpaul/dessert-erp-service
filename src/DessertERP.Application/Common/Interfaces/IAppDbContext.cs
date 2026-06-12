@@ -46,6 +46,7 @@ public interface IAppDbContext
     DbSet<WarehouseInventoryBalance> WarehouseInventoryBalances { get; }
 
     // General Ledger
+    DbSet<FiscalCalendar> FiscalCalendars { get; }
     DbSet<FiscalYear>    FiscalYears    { get; }
     DbSet<FiscalPeriod>  FiscalPeriods  { get; }
     DbSet<AccountType>   AccountTypes   { get; }

@@ -53,6 +53,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<WarehouseInventoryBalance> WarehouseInventoryBalances => Set<WarehouseInventoryBalance>();
 
     // General Ledger
+    public DbSet<FiscalCalendar> FiscalCalendars => Set<FiscalCalendar>();
     public DbSet<FiscalYear>   FiscalYears   => Set<FiscalYear>();
     public DbSet<FiscalPeriod> FiscalPeriods => Set<FiscalPeriod>();
     public DbSet<AccountType>  AccountTypes  => Set<AccountType>();
@@ -187,6 +188,8 @@ public class AppDbContext : DbContext, IAppDbContext
             .HasQueryFilter(e => _orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId);
 
         // GL
+        modelBuilder.Entity<FiscalCalendar>()
+            .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<FiscalYear>()
             .HasQueryFilter(e => !e.IsDeleted && (_orgService == null || _orgService.OrganizationId == Guid.Empty || e.OrganizationId == _orgService.OrganizationId));
         modelBuilder.Entity<Account>()

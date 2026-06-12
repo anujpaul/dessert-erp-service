@@ -359,7 +359,9 @@ public class RetailStatementService : IRetailStatementService
             throw new InvalidOperationException("The retail statement has no transactions.");
 
         var period = await _db.FiscalPeriods.Include(p => p.FiscalYear)
+                .ThenInclude(y => y!.FiscalCalendar)
             .FirstOrDefaultAsync(p => p.FiscalYear!.OrganizationId == statement.OrganizationId &&
+                p.FiscalYear.FiscalCalendar!.IsDefault &&
                 p.FiscalYear.Status == FiscalYearStatus.Open &&
                 p.Status == FiscalPeriodStatus.Open &&
                 p.StartDate.Date <= statement.BusinessDate &&
@@ -544,7 +546,9 @@ public class RetailStatementService : IRetailStatementService
         bankAccount.AdjustBalance(deposit);
 
         var period = await _db.FiscalPeriods.Include(p => p.FiscalYear)
+                .ThenInclude(y => y!.FiscalCalendar)
             .FirstOrDefaultAsync(p => p.FiscalYear!.OrganizationId == settlement.OrganizationId &&
+                p.FiscalYear.FiscalCalendar!.IsDefault &&
                 p.FiscalYear.Status == FiscalYearStatus.Open &&
                 p.Status == FiscalPeriodStatus.Open &&
                 p.StartDate.Date <= DateTime.UtcNow.Date &&

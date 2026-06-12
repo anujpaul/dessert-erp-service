@@ -8,7 +8,7 @@ public class CampaignConfiguration : IEntityTypeConfiguration<Campaign>
 {
     public void Configure(EntityTypeBuilder<Campaign> b)
     {
-        b.ToTable("Campaigns");
+        b.ToTable("campaigns");
         b.HasKey(e => e.Id);
 
         b.Property(e => e.Name).IsRequired().HasMaxLength(200);
@@ -29,7 +29,7 @@ public class LoyaltyProgramConfiguration : IEntityTypeConfiguration<LoyaltyProgr
 {
     public void Configure(EntityTypeBuilder<LoyaltyProgram> b)
     {
-        b.ToTable("LoyaltyPrograms");
+        b.ToTable("loyalty_programs");
         b.HasKey(e => e.Id);
 
         b.Property(e => e.Name).IsRequired().HasMaxLength(200);
@@ -45,7 +45,7 @@ public class CustomerLoyaltyAccountConfiguration : IEntityTypeConfiguration<Cust
 {
     public void Configure(EntityTypeBuilder<CustomerLoyaltyAccount> b)
     {
-        b.ToTable("CustomerLoyaltyAccounts");
+        b.ToTable("customer_loyalty_accounts");
         b.HasKey(e => e.Id);
 
         b.Property(e => e.CustomerName).IsRequired().HasMaxLength(200);

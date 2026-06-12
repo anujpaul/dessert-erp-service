@@ -8,7 +8,7 @@ public class PriceAgreementConfiguration : IEntityTypeConfiguration<PriceAgreeme
 {
     public void Configure(EntityTypeBuilder<PriceAgreement> b)
     {
-        b.ToTable("PriceAgreements");
+        b.ToTable("price_agreements");
         b.HasKey(e => e.Id);
 
         b.Property(e => e.Name).IsRequired().HasMaxLength(200);

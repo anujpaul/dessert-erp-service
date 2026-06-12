@@ -3,6 +3,7 @@ using System;
 using DessertERP.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DessertERP.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260612032334_StandardizeDatabaseNamesToSnakeCase")]
+    partial class StandardizeDatabaseNamesToSnakeCase
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3992,66 +3995,6 @@ namespace DessertERP.Infrastructure.Migrations
                     b.ToTable("currencies", (string)null);
                 });
 
-            modelBuilder.Entity("DessertERP.Domain.Modules.GeneralLedger.FiscalCalendar", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("CalendarType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("calendar_type");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("description");
-
-                    b.Property<bool>("IsDefault")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_default");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("name");
-
-                    b.Property<Guid>("OrganizationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("organization_id");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_fiscal_calendars");
-
-                    b.HasIndex("OrganizationId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_fiscal_calendars_organization_id")
-                        .HasFilter("is_default = TRUE AND is_deleted = FALSE");
-
-                    b.HasIndex("OrganizationId", "Name")
-                        .IsUnique()
-                        .HasDatabaseName("ix_fiscal_calendars_organization_id_name");
-
-                    b.ToTable("fiscal_calendars", (string)null);
-                });
-
             modelBuilder.Entity("DessertERP.Domain.Modules.GeneralLedger.FiscalPeriod", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4135,10 +4078,6 @@ namespace DessertERP.Infrastructure.Migrations
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("end_date");
 
-                    b.Property<Guid>("FiscalCalendarId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("fiscal_calendar_id");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
@@ -4174,9 +4113,9 @@ namespace DessertERP.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("pk_fiscal_years");
 
-                    b.HasIndex("FiscalCalendarId", "Name")
+                    b.HasIndex("OrganizationId", "Name")
                         .IsUnique()
-                        .HasDatabaseName("ix_fiscal_years_fiscal_calendar_id_name");
+                        .HasDatabaseName("ix_fiscal_years_organization_id_name");
 
                     b.ToTable("fiscal_years", (string)null);
                 });
@@ -8327,18 +8266,6 @@ namespace DessertERP.Infrastructure.Migrations
                     b.Navigation("FiscalYear");
                 });
 
-            modelBuilder.Entity("DessertERP.Domain.Modules.GeneralLedger.FiscalYear", b =>
-                {
-                    b.HasOne("DessertERP.Domain.Modules.GeneralLedger.FiscalCalendar", "FiscalCalendar")
-                        .WithMany("FiscalYears")
-                        .HasForeignKey("FiscalCalendarId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_fiscal_years_fiscal_calendars_fiscal_calendar_id");
-
-                    b.Navigation("FiscalCalendar");
-                });
-
             modelBuilder.Entity("DessertERP.Domain.Modules.GeneralLedger.JournalEntry", b =>
                 {
                     b.HasOne("DessertERP.Domain.Modules.GeneralLedger.FiscalPeriod", "FiscalPeriod")
@@ -8823,11 +8750,6 @@ namespace DessertERP.Infrastructure.Migrations
                     b.Navigation("DepreciationEntries");
 
                     b.Navigation("MaintenanceRecords");
-                });
-
-            modelBuilder.Entity("DessertERP.Domain.Modules.GeneralLedger.FiscalCalendar", b =>
-                {
-                    b.Navigation("FiscalYears");
                 });
 
             modelBuilder.Entity("DessertERP.Domain.Modules.GeneralLedger.FiscalYear", b =>

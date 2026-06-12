@@ -158,13 +158,18 @@ public static class DatabaseSeeder
         if (await db.FiscalYears.IgnoreQueryFilters().AnyAsync(f => f.OrganizationId == orgId)) return;
         logger.LogInformation("Seeding fiscal years...");
 
-        var fy2025 = new FiscalYear(orgId, "FY2025", "Fiscal Year 2025",
-            new DateTime(2025, 1, 1), new DateTime(2025, 12, 31));
+        var calendar = new FiscalCalendar(
+            orgId, "Corporate Calendar", "Primary monthly posting calendar",
+            FiscalCalendarTypes.Monthly, true);
+        db.FiscalCalendars.Add(calendar);
+
+        var fy2025 = new FiscalYear(orgId, calendar.Id, "FY2025", "Fiscal Year 2025",
+            new DateTime(2025, 1, 1), new DateTime(2025, 12, 31), calendar.CalendarType);
         fy2025.GenerateMonthlyPeriods();
         db.FiscalYears.Add(fy2025);
 
-        var fy2026 = new FiscalYear(orgId, "FY2026", "Fiscal Year 2026",
-            new DateTime(2026, 1, 1), new DateTime(2026, 12, 31));
+        var fy2026 = new FiscalYear(orgId, calendar.Id, "FY2026", "Fiscal Year 2026",
+            new DateTime(2026, 1, 1), new DateTime(2026, 12, 31), calendar.CalendarType);
         fy2026.GenerateMonthlyPeriods();
         db.FiscalYears.Add(fy2026);
 

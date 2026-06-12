@@ -36,6 +36,7 @@ using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.IdentityModel.Tokens;
 //using Microsoft.OpenApi.Models;
 
@@ -58,7 +59,9 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString,
-        npgsql => npgsql.MigrationsAssembly("DessertERP.Infrastructure")));
+            npgsql => npgsql.MigrationsAssembly("DessertERP.Infrastructure"))
+        .UseSnakeCaseNamingConvention()
+        .ReplaceService<IHistoryRepository, LegacyNamingHistoryRepository>());
 
 builder.Services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 

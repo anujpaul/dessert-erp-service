@@ -957,8 +957,10 @@ public class AccountsReceivableService : IAccountsReceivableService
         var date = entryDate.Date;
         var period = await _db.FiscalPeriods
             .Include(p => p.FiscalYear)
+                .ThenInclude(y => y!.FiscalCalendar)
             .FirstOrDefaultAsync(p =>
                 p.FiscalYear!.OrganizationId == organizationId &&
+                p.FiscalYear.FiscalCalendar!.IsDefault &&
                 p.FiscalYear.Status == FiscalYearStatus.Open &&
                 p.Status == FiscalPeriodStatus.Open &&
                 p.StartDate.Date <= date &&

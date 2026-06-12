@@ -4,6 +4,27 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace DessertERP.Infrastructure.Persistence.Configurations;
 
+public class FiscalCalendarConfiguration : IEntityTypeConfiguration<FiscalCalendar>
+{
+    public void Configure(EntityTypeBuilder<FiscalCalendar> b)
+    {
+        b.ToTable("fiscal_calendars");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.OrganizationId).IsRequired();
+        b.Property(e => e.Name).HasMaxLength(100).IsRequired();
+        b.Property(e => e.Description).HasMaxLength(500);
+        b.Property(e => e.CalendarType).HasMaxLength(20).IsRequired();
+        b.HasIndex(e => new { e.OrganizationId, e.Name }).IsUnique();
+        b.HasIndex(e => e.OrganizationId)
+            .IsUnique()
+            .HasFilter("is_default = TRUE AND is_deleted = FALSE");
+        b.HasMany(e => e.FiscalYears)
+            .WithOne(e => e.FiscalCalendar)
+            .HasForeignKey(e => e.FiscalCalendarId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 public class FiscalYearConfiguration : IEntityTypeConfiguration<FiscalYear>
 {
     public void Configure(EntityTypeBuilder<FiscalYear> b)
@@ -11,6 +32,7 @@ public class FiscalYearConfiguration : IEntityTypeConfiguration<FiscalYear>
         b.ToTable("fiscal_years");
         b.HasKey(e => e.Id);
         b.Property(e => e.OrganizationId).IsRequired();
+        b.Property(e => e.FiscalCalendarId).IsRequired();
         b.Property(e => e.Name).HasMaxLength(100).IsRequired();
         b.Property(e => e.Description).HasMaxLength(500);
         b.Property(e => e.CalendarType).HasMaxLength(50);
@@ -18,7 +40,7 @@ public class FiscalYearConfiguration : IEntityTypeConfiguration<FiscalYear>
         // Query filter is applied in AppDbContext.OnModelCreating
         b.HasMany(e => e.Periods).WithOne(p => p.FiscalYear)
             .HasForeignKey(p => p.FiscalYearId).OnDelete(DeleteBehavior.Cascade);
-        b.HasIndex(e => new { e.OrganizationId, e.Name }).IsUnique();
+        b.HasIndex(e => new { e.FiscalCalendarId, e.Name }).IsUnique();
     }
 }
 

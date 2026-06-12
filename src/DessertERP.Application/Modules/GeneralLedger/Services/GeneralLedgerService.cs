@@ -8,7 +8,10 @@ namespace DessertERP.Application.Modules.GeneralLedger.Services;
 public interface IGeneralLedgerService
 {
     // Fiscal Calendar
-    Task<IEnumerable<FiscalYearDto>> GetFiscalYearsAsync(CancellationToken ct = default);
+    Task<IEnumerable<FiscalCalendarDto>> GetFiscalCalendarsAsync(CancellationToken ct = default);
+    Task<FiscalCalendarDto> CreateFiscalCalendarAsync(CreateFiscalCalendarRequest req, CancellationToken ct = default);
+    Task SetDefaultFiscalCalendarAsync(Guid id, CancellationToken ct = default);
+    Task<IEnumerable<FiscalYearDto>> GetFiscalYearsAsync(Guid? fiscalCalendarId = null, CancellationToken ct = default);
     Task<FiscalYearDto?> GetFiscalYearAsync(Guid id, CancellationToken ct = default);
     Task<FiscalYearDto> CreateFiscalYearAsync(CreateFiscalYearRequest req, CancellationToken ct = default);
     Task CloseFiscalYearAsync(Guid id, CancellationToken ct = default);
@@ -59,10 +62,65 @@ public class GeneralLedgerService : IGeneralLedgerService
 
     // ── Fiscal Calendar ───────────────────────────────────────────────────────
 
-    public async Task<IEnumerable<FiscalYearDto>> GetFiscalYearsAsync(CancellationToken ct = default)
+    public async Task<IEnumerable<FiscalCalendarDto>> GetFiscalCalendarsAsync(CancellationToken ct = default)
     {
-        var years = await _db.FiscalYears
-            .Where(y => !y.IsDeleted)
+        var calendars = await _db.FiscalCalendars
+            .Include(c => c.FiscalYears)
+            .OrderByDescending(c => c.IsDefault)
+            .ThenBy(c => c.Name)
+            .ToListAsync(ct);
+        return calendars.Select(ToFiscalCalendarDto);
+    }
+
+    public async Task<FiscalCalendarDto> CreateFiscalCalendarAsync(
+        CreateFiscalCalendarRequest req,
+        CancellationToken ct = default)
+    {
+        var normalizedName = req.Name.Trim().ToLower();
+        if (await _db.FiscalCalendars.AnyAsync(c => c.Name.ToLower() == normalizedName, ct))
+            throw new InvalidOperationException("A fiscal calendar with this name already exists.");
+
+        var makeDefault = req.IsDefault || !await _db.FiscalCalendars.AnyAsync(ct);
+        if (makeDefault)
+            await _db.FiscalCalendars
+                .Where(c => c.IsDefault)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(c => c.IsDefault, false),
+                    ct);
+
+        var calendar = new FiscalCalendar(
+            _org.OrganizationId, req.Name, req.Description, req.CalendarType, makeDefault);
+        _db.FiscalCalendars.Add(calendar);
+        await _db.SaveChangesAsync(ct);
+        return ToFiscalCalendarDto(calendar);
+    }
+
+    public async Task SetDefaultFiscalCalendarAsync(Guid id, CancellationToken ct = default)
+    {
+        var calendar = await _db.FiscalCalendars.FirstOrDefaultAsync(c => c.Id == id, ct)
+            ?? throw new InvalidOperationException("Fiscal calendar not found.");
+        if (calendar.IsDefault) return;
+
+        await _db.FiscalCalendars
+            .Where(c => c.IsDefault)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(c => c.IsDefault, false),
+                ct);
+        calendar.SetDefault(true);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<IEnumerable<FiscalYearDto>> GetFiscalYearsAsync(
+        Guid? fiscalCalendarId = null,
+        CancellationToken ct = default)
+    {
+        var query = _db.FiscalYears
+            .Include(y => y.FiscalCalendar)
+            .Where(y => !y.IsDeleted);
+        if (fiscalCalendarId.HasValue)
+            query = query.Where(y => y.FiscalCalendarId == fiscalCalendarId.Value);
+
+        var years = await query
             .OrderByDescending(y => y.StartDate)
             .ToListAsync(ct);
         return years.Select(ToFiscalYearDto);
@@ -70,22 +128,43 @@ public class GeneralLedgerService : IGeneralLedgerService
 
     public async Task<FiscalYearDto?> GetFiscalYearAsync(Guid id, CancellationToken ct = default)
     {
-        var y = await _db.FiscalYears.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
+        var y = await _db.FiscalYears
+            .Include(x => x.FiscalCalendar)
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
         return y is null ? null : ToFiscalYearDto(y);
     }
 
     public async Task<FiscalYearDto> CreateFiscalYearAsync(CreateFiscalYearRequest req, CancellationToken ct = default)
     {
-        var fy = new FiscalYear(_org.OrganizationId, req.Name, req.Description, req.StartDate, req.EndDate, req.CalendarType);
-        // No auto-generation — user defines periods explicitly after creation
+        var calendar = await _db.FiscalCalendars.FirstOrDefaultAsync(
+            c => c.Id == req.FiscalCalendarId, ct)
+            ?? throw new InvalidOperationException("Fiscal calendar not found.");
+
+        if (await _db.FiscalYears.AnyAsync(y =>
+            y.FiscalCalendarId == calendar.Id &&
+            req.StartDate <= y.EndDate &&
+            req.EndDate >= y.StartDate, ct))
+            throw new InvalidOperationException("Fiscal years in the same calendar cannot overlap.");
+
+        var fy = new FiscalYear(
+            _org.OrganizationId,
+            calendar.Id,
+            req.Name,
+            req.Description,
+            req.StartDate,
+            req.EndDate,
+            calendar.CalendarType);
+        if (req.AutoGeneratePeriods && calendar.CalendarType != FiscalCalendarTypes.Custom)
+            fy.GeneratePeriodsForCalendar();
         _db.FiscalYears.Add(fy);
         await _db.SaveChangesAsync(ct);
-        return ToFiscalYearDto(fy);
+        return ToFiscalYearDto(fy, calendar.Name);
     }
 
     public async Task<FiscalPeriodDto> CreatePeriodAsync(Guid fiscalYearId, CreatePeriodRequest req, CancellationToken ct = default)
     {
         var fy = await _db.FiscalYears
+            .Include(y => y.FiscalCalendar)
             .Include(y => y.Periods)
             .FirstOrDefaultAsync(y => y.Id == fiscalYearId && !y.IsDeleted, ct)
             ?? throw new InvalidOperationException("Fiscal year not found.");
@@ -107,15 +186,18 @@ public class GeneralLedgerService : IGeneralLedgerService
         await _db.SaveChangesAsync(ct);
 
         // 2. Build period list using domain helpers (these operate on an in-memory FY)
-        var template = new FiscalYear(_org.OrganizationId, fy.Name, fy.Description, fy.StartDate, fy.EndDate, fy.CalendarType);
-        switch (req.Type.ToUpperInvariant())
-        {
-            case "MONTHLY":   template.GenerateMonthlyPeriods();   break;
-            case "QUARTERLY": template.GenerateQuarterlyPeriods(); break;
-            case "4-4-5":     template.Generate445Periods();       break;
-            default: throw new InvalidOperationException(
-                $"Unknown period type '{req.Type}'. Valid values: Monthly, Quarterly, 4-4-5.");
-        }
+        if (fy.CalendarType == FiscalCalendarTypes.Custom)
+            throw new InvalidOperationException("Custom calendars require periods to be entered manually.");
+
+        var template = new FiscalYear(
+            _org.OrganizationId,
+            fy.FiscalCalendarId,
+            fy.Name,
+            fy.Description,
+            fy.StartDate,
+            fy.EndDate,
+            fy.CalendarType);
+        template.GeneratePeriodsForCalendar();
 
         // 3. Persist generated periods with the real FiscalYearId
         var saved = new List<FiscalPeriod>();
@@ -186,7 +268,10 @@ public class GeneralLedgerService : IGeneralLedgerService
     {
         var today = DateTime.UtcNow.Date;
         var period = await _db.FiscalPeriods
+            .Include(p => p.FiscalYear)
+                .ThenInclude(y => y!.FiscalCalendar)
             .Where(p => !p.IsDeleted && p.Status == FiscalPeriodStatus.Open
+                        && p.FiscalYear!.FiscalCalendar!.IsDefault
                         && p.StartDate <= today && p.EndDate >= today)
             .OrderBy(p => p.StartDate)
             .FirstOrDefaultAsync(ct);
@@ -407,9 +492,22 @@ public class GeneralLedgerService : IGeneralLedgerService
 
     // ── Mappers ───────────────────────────────────────────────────────────────
 
-    private static FiscalYearDto ToFiscalYearDto(FiscalYear y) => new(
-        y.Id, y.Name, y.Description, y.StartDate, y.EndDate,
-        y.CalendarType, y.Status.ToString(), y.PeriodCount, y.CreatedAt);
+    private static FiscalCalendarDto ToFiscalCalendarDto(FiscalCalendar calendar) => new(
+        calendar.Id,
+        calendar.Name,
+        calendar.Description,
+        calendar.CalendarType,
+        calendar.IsDefault,
+        calendar.FiscalYears.Count(y => !y.IsDeleted),
+        calendar.CreatedAt);
+
+    private static FiscalYearDto ToFiscalYearDto(FiscalYear y)
+        => ToFiscalYearDto(y, y.FiscalCalendar?.Name ?? string.Empty);
+
+    private static FiscalYearDto ToFiscalYearDto(FiscalYear y, string calendarName) => new(
+        y.Id, y.Name, y.Description, y.FiscalCalendarId, calendarName,
+        y.StartDate, y.EndDate, y.CalendarType,
+        y.Status.ToString(), y.PeriodCount, y.CreatedAt);
 
     private static FiscalPeriodDto ToPeriodDto(FiscalPeriod p) => new(
         p.Id, p.FiscalYearId, p.PeriodNumber, p.Name,

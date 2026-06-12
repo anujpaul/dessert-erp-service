@@ -1,7 +1,23 @@
 namespace DessertERP.Application.Modules.GeneralLedger.DTOs;
 
 // ── Fiscal Year ───────────────────────────────────────────────────────────────
+public record FiscalCalendarDto(
+    Guid Id,
+    string Name,
+    string Description,
+    string CalendarType,
+    bool IsDefault,
+    int FiscalYearCount,
+    DateTime CreatedAt);
+
+public record CreateFiscalCalendarRequest(
+    string Name,
+    string Description,
+    string CalendarType,
+    bool IsDefault = false);
+
 public record FiscalYearDto(Guid Id, string Name, string Description,
+    Guid FiscalCalendarId, string FiscalCalendarName,
     DateTime StartDate, DateTime EndDate, string CalendarType,
     string Status, int PeriodCount, DateTime CreatedAt);
 
@@ -9,16 +25,17 @@ public record FiscalPeriodDto(Guid Id, Guid FiscalYearId, int PeriodNumber,
     string Name, DateTime StartDate, DateTime EndDate, string Status);
 
 public record CreateFiscalYearRequest(
+    Guid FiscalCalendarId,
     string Name, string Description,
     DateTime StartDate, DateTime EndDate,
-    string CalendarType = "Monthly");
+    bool AutoGeneratePeriods = true);
 
 /// <summary>Manually add a single custom period.</summary>
 public record CreatePeriodRequest(string Name, DateTime StartDate, DateTime EndDate);
 
 /// <summary>Bulk-generate periods using a preset calendar pattern.</summary>
 /// <param name="Type">Monthly | Quarterly | 4-4-5</param>
-public record GeneratePeriodsRequest(string Type);
+public record GeneratePeriodsRequest(string? Type = null);
 
 /// <summary>Rename / re-date an existing Open period.</summary>
 public record UpdatePeriodRequest(string Name, DateTime StartDate, DateTime EndDate);
